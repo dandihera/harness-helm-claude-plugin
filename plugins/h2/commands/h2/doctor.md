@@ -23,7 +23,7 @@ allowed-tools: [Bash, Read]
 
 기본값:
 
-- `--target`: 현재 working directory
+- `--target`: 지정하지 않으면 현재 위치에서 `git rev-parse --show-toplevel`로 repository root를 자동 감지하고, 실패하면 현재 working directory
 - `--dry-run`: false (false면 사용자 승인 후 실제 적용)
 - `--backup`: false (managed block 외부 수정이 있는 파일에 권장)
 - `--allow-non-git`: false (`.git` 없으면 중단)
@@ -33,7 +33,9 @@ allowed-tools: [Bash, Read]
 이 command는 prompt template이며, 모델이 다음 순서로 `Bash`·`Read` tool을 호출해 진행한다.
 
 1. **Target resolution**
-   - `--target`이 있으면 그 경로, 없으면 현재 working directory를 target으로 결정.
+   - `--target`이 있으면 그 경로를 target으로 결정.
+   - `--target`이 없으면 `Bash`로 `git rev-parse --show-toplevel`을 실행해 현재 위치가 속한 git repository root를 target으로 결정.
+   - `git rev-parse --show-toplevel`이 실패하면 `pwd`를 target으로 결정.
    - `Bash`로 `test -d <target>/.git`을 확인. `.git`이 없고 `--allow-non-git`도 없으면 안내 후 중단.
 
 2. **Plugin root resolution (다음 우선순위)**
