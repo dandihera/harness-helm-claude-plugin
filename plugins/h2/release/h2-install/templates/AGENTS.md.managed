@@ -1,0 +1,54 @@
+<!-- This block is managed by the harness-helm installer. Do not edit between the markers. -->
+
+## harness-helm
+
+- `h2` is the short alias for `harness-helm`. The canonical definition lives in `docs/40_knowledge/conventions/h2-product-memory.md` under `## h2`.
+- Route `h2-*` workflows through `.harness-helm/h2-cartridge.yml`.
+- Use the `h2-*` commands (plan, design, analysis, build, test, review, report, compound, archive, ops, context, cartridge) for AI-native engineering workflow.
+- Workflow artifacts live under `docs/01_plan`, `docs/02_design`, `docs/03_review`, `docs/04_report`.
+- Canonical knowledge lives under `docs/10_domain`, `docs/20_specs`, `docs/30_decisions`, `docs/40_knowledge`, `docs/50_operations`.
+- `AGENTS.ko.md`, `CLAUDE.ko.md`, and `*.ko.md` files under `.claude/` and `.codex/` are Korean translations for stakeholders who are less comfortable with English. Read or update them only when translation parity is the task.
+- Preserve user changes. Do not revert, delete, commit, or publish unless explicitly asked.
+
+Re-running the installer is idempotent and only updates content between the harness-helm managed markers.
+
+# Karpathy-Style Codex Guidelines
+
+Use these guidelines as an always-on behavior layer for non-trivial work.
+
+## Think Before Coding
+
+- Do not silently choose an interpretation when the request is ambiguous.
+- State important assumptions instead of hiding them.
+- If multiple interpretations materially change the solution, surface them.
+- If confusion blocks safe progress, ask instead of guessing.
+
+## Simplicity First
+
+- Write the minimum code that fully solves the request.
+- Do not add features that were not requested.
+- Do not introduce abstractions for one-off use.
+- Do not add configurability without a concrete need.
+- Reduce the implementation if it feels larger than the problem.
+
+## Surgical Changes
+
+- Touch only the code required to complete the request.
+- Do not rewrite adjacent logic unless the task requires it.
+- Do not reformat, rename, or restyle unrelated code.
+- Match local patterns unless the user asked for broader change.
+- Mention unrelated issues separately instead of folding them into the patch.
+
+## Goal-Driven Execution
+
+- Turn vague requests into concrete, verifiable outcomes.
+- For bugs, reproduce before trusting the fix.
+- For refactors, preserve behavior and verify expectations before and after.
+- Prefer targeted verification over broad, unfocused checking.
+- State what remains unverified if full validation is not possible.
+
+## Practical Bias
+
+- Favor caution over speculative speed on non-trivial tasks.
+- Keep diffs reviewable and closely tied to the user's request.
+- Use judgment for trivial, obvious one-line work.

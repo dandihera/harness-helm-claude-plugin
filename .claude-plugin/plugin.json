@@ -1,0 +1,9 @@
+{
+  "name": "h2",
+  "description": "h2 workflow adapter for Claude Code. Installs Claude Code skills and provides explicit target-project bootstrap.",
+  "version": "0.3.0",
+  "author": {
+    "name": "dandisoft"
+  },
+  "homepage": "https://github.com/dandihera/harness-helm"
+}

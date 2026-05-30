@@ -1,0 +1,412 @@
+# ============================================================================
+# harness-helm h2 cartridge mapping (Single Source of Truth)
+# ============================================================================
+# 이 파일은 12개 `h2-*` command 각각이 어떤 upstream provider/surface를
+# 호출하고, 호출 실패 시 어떤 fallback label과 routing target을 쓸지 정의한다.
+#
+# 소스 cookbook (변경 시 본 파일과 함께 갱신):
+#   - cookbooks/0300-workflow-contract/0303-workflow-lifecycle-commands.md
+#       command lifecycle 순서와 산출 의미
+#   - cookbooks/0600-upstream-integration/0601-upstream-tool-invocation.md
+#       command별 provider/surface/fallback/routing 호출 계약
+#   - cookbooks/0600-upstream-integration/0602-upstream-tool-registry.md
+#       upstream tool registry 필드 정의·등록 절차
+#   - cookbooks/0600-upstream-integration/0603-upstream-surface-map.md
+#       12 command × 3 provider 후보 매트릭스와 정책 전환 근거
+#
+# 검증:
+#   .harness-helm/scripts/harness cartridge-validate --strict
+#
+# CI:
+#   .github/workflows/harness-validate.yml 이 PR/push마다 blocking으로 실행한다.
+#
+# 기준 위계:
+#   cookbook(기준 정의) > 이 파일(실행 기준) > .claude/.codex skill references(runtime snapshot)
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# external_tool_registry: upstream 도구 카탈로그
+# ----------------------------------------------------------------------------
+# h2 command가 호출할 수 있는 upstream 도구의 메타데이터·가용성·preferred command
+# 매핑을 정의한다. 신규 도구 등록은 registration_process 단계를 그대로 따른다.
+external_tool_registry:
+
+  # 이 registry 자체의 기준 위치. cookbook 0602는 정책을, 본 파일은 데이터를 보유한다.
+  # 참고: source_of_truth 필드 이름은 external registry 계약이라 유지하고, 한국어 설명만 정책에 맞춰 다듬는다.
+  source_of_truth: .harness-helm/h2-cartridge.yml
+
+  # 각 tool 엔트리가 반드시 가져야 하는 필드 목록.
+  # h2-cartridge validator가 이 목록의 누락을 hard_error로 검출한다.
+  registration_fields:
+    # 안정적 식별자 (영문 소문자/하이픈)
+    - id
+    # 사용자 노출 명칭
+    - display_name
+    # 도구 분류 (engineering-workflow-toolkit 등)
+    - category
+    # 호출 가능한 surface(skill/command) 식별자 배열
+    - surfaces
+    # runtime별 가용성 (claude_code, codex)
+    - availability
+    # 이 도구를 우선 선호하는 h2-* command 목록
+    - preferred_for
+    # 도구 전체가 미사용일 때 사용할 fallback label
+    - fallback
+    # 이 도구를 사용할 수 없을 때 시도할 다른 provider 우선순위
+    - alternatives
+    # 도구 정의의 기준 위치 (보통 이 파일 자신; source_of_truth 필드명은 external 계약이라 유지)
+    - source_of_truth
+    # h2-cartridge가 검증해야 할 규칙
+    - validation
+    # 사용 가이드 메모
+    - notes
+
+  # 책임 경계 1: registry는 호출 target만 선정한다.
+  # h2 command의 의미(0301-core-workflow-spec)는 바꾸지 않는다.
+  semantics_boundary: "Registry entries select execution targets only; they do not change 0301-core-workflow-spec h2 command semantics."
+
+  # 책임 경계 2: command별 provider/surface/fallback/routing은 commands.* 블록이 보유한다.
+  # 0601-upstream-tool-invocation 호환성을 위해 이 분리를 유지한다.
+  invocation_boundary: "Command-level provider/surface/fallback/routing remains under commands.* for 0601-upstream-tool-invocation compatibility."
+
+  # --------------------------------------------------------------------------
+  # tools: 도구별 정의 블록
+  # --------------------------------------------------------------------------
+  tools:
+
+    # ------------------------------------------------------------------------
+    # gstack — plan/review/QA/docs/ops 계열에 강한 engineering workflow toolkit.
+    # ------------------------------------------------------------------------
+    gstack:
+      id: gstack
+      display_name: GStack
+      category: engineering-workflow-toolkit
+      # gstack이 노출하는 surface 목록.
+      # cartridge validator가 이 목록과 commands.* surface 참조의 정합성을 검증한다.
+      surfaces:
+        - gstack-autoplan
+        - gstack-plan-ceo-review
+        - gstack-plan-eng-review
+        - gstack-plan-design-review
+        - gstack-design-consultation
+        - gstack-document-release
+        - gstack-ship
+        - gstack-review
+        - gstack-health
+        - gstack-qa
+        - gstack-learn
+        - gstack-canary
+      availability:
+        # Claude Code 환경: gstack skill이 설치돼 있어야 사용 가능.
+        claude_code: available-when-gstack-skills-installed
+        codex: available-when-gstack-skills-installed
+      # gstack을 primary로 선호하는 h2 command 목록.
+      preferred_for:
+        - h2-plan
+        - h2-ops
+      # gstack 전체가 미사용일 때 사용할 fallback label.
+      fallback: verified-fallback:gstack-plan-checklist
+      # gstack을 쓸 수 없을 때 시도할 다음 후보 우선순위.
+      alternatives:
+        - superpowers
+        - compound-engineering
+        - harness
+      source_of_truth: .harness-helm/h2-cartridge.yml
+      validation:
+        # commands.*에서 참조한 surface가 위 surfaces 목록에 존재하는지 검증.
+        - h2-cartridge validates referenced command surfaces.
+        # 설치돼 있지 않은 surface는 h2 output의 verification.not_verified에 기록한다.
+        - Record unavailable surfaces in verification.not_verified.
+      notes:
+        - Use for planning, ship/review support, QA, ops, and documentation release assistance.
+
+    # ------------------------------------------------------------------------
+    # superpowers — TDD·verification·plan breakdown discipline에 강한 skill workflow.
+    # ------------------------------------------------------------------------
+    superpowers:
+      id: superpowers
+      display_name: Superpowers
+      category: structured-skill-workflow
+      surfaces:
+        - brainstorming
+        - writing-plans
+        - test-driven-development
+        - verification-before-completion
+      availability:
+        # Claude Code: project별로 다르고 fallback 가능.
+        claude_code: fallback-or-project-dependent
+        # Codex: superpowers plugin이 설치돼 있어야 사용 가능.
+        codex: available-when-superpowers-plugin-installed
+      # superpowers를 primary로 선호하는 h2 command.
+      # 참고: h2-design은 0603 정책 전환으로 compound-engineering ce-plan으로 이전됐다.
+      preferred_for:
+        - h2-build
+      fallback: verified-fallback:superpowers-workflow-checklist
+      alternatives:
+        - gstack
+        - compound-engineering
+        - harness
+      source_of_truth: .harness-helm/h2-cartridge.yml
+      validation:
+        - h2-cartridge validates referenced skill surfaces.
+        # 미설치 시에도 commands.*에 정의된 checklist fallback label은 유지한다.
+        - If unavailable, preserve the checklist fallback label from commands.*.
+      notes:
+        - Use for conditional design clarification, TDD framing, and verification discipline.
+
+    # ------------------------------------------------------------------------
+    # compound-engineering — plan/work/review/doc-review/compound/PR workflow에 강한 plugin.
+    # ------------------------------------------------------------------------
+    compound-engineering:
+      id: compound-engineering
+      display_name: Compound Engineering
+      category: engineering-plugin
+      surfaces:
+        - ce-brainstorm
+        - ce-plan
+        - ce-doc-review
+        - ce-code-review
+        - ce-compound
+        - ce-compound-refresh
+        # gstack-product-pulse drift fix (0603): gstack에 없어 ce-product-pulse가 대체 후보.
+        - ce-product-pulse
+        - ce-release-notes
+        - ce-clean-gone-branches
+      availability:
+        claude_code: available-when-compound-plugin-installed
+        codex: available-when-compound-plugin-installed
+      # compound-engineering을 primary로 선호하는 h2 command.
+      # h2-design은 0603 정책 전환으로 superpowers brainstorming에서 ce-plan으로 이전됐다.
+      preferred_for:
+        - h2-design
+        - h2-report
+        - h2-review
+        - h2-compound
+        - h2-ops
+      fallback: verified-fallback:knowledge-compounding-checklist
+      alternatives:
+        - gstack
+        - superpowers
+        - harness
+      source_of_truth: .harness-helm/h2-cartridge.yml
+      validation:
+        - h2-cartridge validates plugin surface references.
+        # h2 output에 실제 invocation 결과 또는 fallback checklist 사용 여부를 기록한다.
+        - Record actual invocation or cartridge checklist fallback in h2 output.
+      notes:
+        - Use for design planning, review, document review, and compound knowledge workflows.
+
+  # --------------------------------------------------------------------------
+  # registration_process: 신규 upstream 도구 등록 절차
+  # --------------------------------------------------------------------------
+  registration_process:
+    # 1. 안정적 id를 external_tool_registry.tools 아래 추가.
+    - Add a stable id under external_tool_registry.tools.
+    # 2. registration_fields의 모든 필드를 채운다.
+    - Fill every registration field listed in external_tool_registry.registration_fields.
+    # 3. fallback과 alternatives가 정의된 후에만 commands.*에서 참조한다.
+    - Reference the tool from commands.* only after fallback and alternatives are defined.
+    # 4. runtime별로 동작이 다르면 Claude/Codex 양 어댑터의 upstream-tool-invocation reference를 갱신한다.
+    - Update Claude and Codex upstream-tool-invocation references when runtime behavior differs.
+    # 5. h2-cartridge validation을 실행하거나 실행 못한 사유를 기록한다.
+    - Run h2-cartridge validation or record why validation was not performed.
+
+
+# ============================================================================
+# commands: 12개 h2-* command별 실행 매핑
+# ============================================================================
+# 각 command는 아래 5개 필드로 정의된다.
+#   mode             command의 실행 모드 (context-pack/cartridge/recorder/validator 등)
+#   provider         primary upstream provider (또는 harness 자신)
+#   surface          provider가 노출하는 구체 skill/command 식별자
+#   alternatives     primary 미사용 시 시도할 다음 surface 우선순위
+#   fallback_label   모든 surface가 미사용일 때 verification.completed에 남길 라벨
+#   routing_target   command 결과물이 저장될 경로 템플릿
+#
+# {feature}, {run-id}, {type}, {topic} placeholder는 h2 command가 실행 시점에 치환한다.
+# ============================================================================
+commands:
+
+  # --------------------------------------------------------------------------
+  # h2-context: 작업 근거/제외 문서를 선별해 후속 command의 context pack을 만든다.
+  # h2 고유 산출물이므로 provider는 harness 자신이며 upstream alternatives는 두지 않는다.
+  # --------------------------------------------------------------------------
+  h2-context:
+    mode: context-pack
+    provider: harness
+    surface: context-pack
+    alternatives: []
+    fallback_label: verified-fallback:context-pack-only
+    routing_target: .harness-helm/runs/{feature}/{run-id}/context-pack.md
+
+  # --------------------------------------------------------------------------
+  # h2-plan: 목표/scope/done 기준/리스크를 확정한다.
+  # gstack autoplan(CEO·design·eng·DX 관점 plan review 자동 순차 실행)이 primary.
+  # --------------------------------------------------------------------------
+  h2-plan:
+    mode: cartridge
+    provider: gstack
+    surface: gstack-autoplan
+    alternatives:
+      - gstack-plan-ceo-review
+      - gstack-plan-eng-review
+      - gstack-plan-design-review
+      # superpowers: multi-step task를 implementation plan으로 분해.
+      - writing-plans
+    fallback_label: verified-fallback:gstack-plan-checklist
+    routing_target: docs/01_plan/{feature}.md
+
+  # --------------------------------------------------------------------------
+  # h2-design: 구현 흐름/인터페이스/데이터 흐름/검증 전략을 정리한다.
+  # 0603 정책 전환: superpowers brainstorming → compound ce-plan으로 primary 이전.
+  # brainstorming/ce-brainstorm은 h2-plan이 불명확할 때만 조건부 후보.
+  # --------------------------------------------------------------------------
+  h2-design:
+    mode: cartridge
+    provider: compound-engineering
+    surface: ce-plan
+    alternatives:
+      - writing-plans
+      - gstack-plan-eng-review
+      - gstack-design-consultation
+      # 조건부: h2-plan이 vague해 요구/접근을 다시 탐색해야 할 때만.
+      - brainstorming
+      # 조건부: 동일 사유.
+      - ce-brainstorm
+    fallback_label: verified-fallback:compound-design-plan-checklist
+    routing_target: docs/02_design/{feature}.md
+
+  # --------------------------------------------------------------------------
+  # h2-analysis: plan/design consistency·risk·test coverage gap 점검.
+  # harness의 internal checklist가 primary. 외부 surface는 보조.
+  # --------------------------------------------------------------------------
+  h2-analysis:
+    mode: consistency-check
+    provider: harness
+    surface: gstack-superpowers-consistency-checklist
+    alternatives:
+      - gstack-plan-eng-review
+      - verification-before-completion
+    fallback_label: verified-fallback:gstack-superpowers-consistency-checklist
+    routing_target: docs/02_design/{feature}.md
+
+  # --------------------------------------------------------------------------
+  # h2-build: design 실행 산출물·변경 파일·리스크를 기록한다.
+  # 코드/문서/workflow/runtime 설정 산출물을 기록하되, 코드 편집 actor를 대체하지 않는다.
+  # --------------------------------------------------------------------------
+  h2-build:
+    mode: recorder
+    provider: superpowers
+    surface: test-driven-development
+    alternatives:
+      # Codex 자체 코드 편집.
+      - codex-native-code-edit
+      # Claude Code 자체 코드 편집.
+      - claude-native-code-edit
+      - gstack-ship
+    fallback_label: cartridge-checklist-fallback:changed-files-risk-recorder
+    routing_target: .harness-helm/runs/{feature}/{run-id}/build.md
+
+  # --------------------------------------------------------------------------
+  # h2-test: 실행한 테스트·skip 사유·실패 요약·남은 검증을 기록한다.
+  # local test 결과가 기준. upstream은 health/QA 검증 보조.
+  # --------------------------------------------------------------------------
+  h2-test:
+    mode: recorder
+    provider: harness
+    surface: local-test-command
+    alternatives:
+      - gstack-health
+      - gstack-qa
+      - verification-before-completion
+    fallback_label: cartridge-checklist-fallback:test-skip-or-result-recorder
+    routing_target: .harness-helm/runs/{feature}/{run-id}/test.md
+
+  # --------------------------------------------------------------------------
+  # h2-review: code/qa/security/cross review 결과를 표준 위치에 기록한다.
+  # 구조화된 코드 리뷰가 가장 직접적인 upstream fit.
+  # --------------------------------------------------------------------------
+  h2-review:
+    mode: cartridge/checklist
+    provider: compound-engineering
+    surface: ce-code-review
+    alternatives:
+      - gstack-review
+      - verification-before-completion
+    fallback_label: cartridge-checklist-fallback:review-checklist
+    routing_target: docs/03_review/{type}/{feature}.md
+
+  # --------------------------------------------------------------------------
+  # h2-report: plan/design/analysis/build/test/review 결과를 묶고 release/docs/archive
+  # 후보를 정리한다. 여러 산출물의 품질·completeness 검토에 doc-review가 적합.
+  # --------------------------------------------------------------------------
+  h2-report:
+    mode: cartridge
+    provider: compound-engineering
+    surface: ce-doc-review
+    alternatives:
+      - ce-compound
+      - gstack-document-release
+      - gstack-ship
+    fallback_label: verified-fallback:compound-promotion-checklist
+    routing_target: docs/04_report/{feature}.md
+
+  # --------------------------------------------------------------------------
+  # h2-compound: 해결 경험과 반복 가능한 지식을 canonical knowledge로 축적한다.
+  # low-risk learning/solution은 검증 후 docs/40_knowledge에 작성/갱신할 수 있고,
+  # governed canonical 목적지는 별도 approval 전까지 후보로 staging한다.
+  # --------------------------------------------------------------------------
+  h2-compound:
+    mode: knowledge-compounder
+    provider: compound-engineering
+    surface: ce-compound
+    alternatives:
+      - ce-compound-refresh
+      - gstack-learn
+      - gstack-document-release
+    fallback_label: verified-fallback:knowledge-compounding-checklist
+    routing_target: .harness-helm/runs/{feature}/{run-id}/compound-candidates.md
+
+  # --------------------------------------------------------------------------
+  # h2-archive: 01~04 산출물의 archive 이동 계획을 만든다.
+  # 실제 이동은 archive 구현에 위임. 파일 이동·retrieval boundary가 핵심이라 harness가 primary.
+  # --------------------------------------------------------------------------
+  h2-archive:
+    mode: dry-run/checklist
+    provider: harness
+    surface: harness-archive-dry-run
+    alternatives:
+      - archive-checklist
+    fallback_label: cartridge-checklist-fallback:archive-boundary-check
+    routing_target: .harness-helm/runs/{feature}/{run-id}/archive-plan.md
+
+  # --------------------------------------------------------------------------
+  # h2-ops: runbook/incident/release/sweep 같은 운영 기록 후보를 정리한다.
+  # docs-release와 post-deploy signal surface가 적합.
+  # ce-product-pulse는 gstack-product-pulse drift fix(0603)의 대체 후보다.
+  # --------------------------------------------------------------------------
+  h2-ops:
+    mode: candidate-recorder
+    provider: gstack
+    surface: gstack-document-release
+    alternatives:
+      - gstack-canary
+      # gstack-product-pulse 미존재 drift의 대체 후보.
+      - ce-product-pulse
+      - ce-release-notes
+      - ce-clean-gone-branches
+      - ops-checklist
+    fallback_label: cartridge-checklist-fallback:ops-candidate-checklist
+    routing_target: docs/50_operations/{type}/{topic}.md
+
+  # --------------------------------------------------------------------------
+  # h2-cartridge: provider/surface/routing config 무결성을 검증하는 meta command.
+  # 검증 실패 시 fallback으로 진행하지 않고 즉시 blocked 처리한다.
+  # --------------------------------------------------------------------------
+  h2-cartridge:
+    mode: validator
+    provider: harness
+    surface: harness cartridge-validate
+    alternatives: []
+    fallback_label: blocked
+    routing_target: .harness-helm/runs/{feature}/{run-id}/cartridge-mapping.md

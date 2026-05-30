@@ -1,0 +1,23 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "dandisoft-harness-helm",
+  "version": "0.3.0",
+  "description": "harness-helm h2 workflow marketplace",
+  "owner": {
+    "name": "dandisoft"
+  },
+  "plugins": [
+    {
+      "name": "h2",
+      "description": "h2 workflow adapter and explicit bootstrap installer for Claude Code.",
+      "version": "0.3.0",
+      "author": {
+        "name": "dandisoft"
+      },
+      "repository": "https://github.com/dandihera/harness-helm",
+      "source": "./plugins/h2",
+      "category": "development",
+      "keywords": ["h2", "harness-helm", "workflow", "agentic"]
+    }
+  ]
+}

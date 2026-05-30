@@ -1,0 +1,64 @@
+# harness-helm 설치 manifest
+# 규칙: 이 파일에 작성하는 주석은 한글로 기입한다.
+# 형식: <kind> <source> <destination>
+#   kind:        copy | copy_dir | managed
+#   source:      h2-install/ 기준 상대 경로(이 manifest가 있는 디렉터리)
+#   destination: --target root 기준 상대 경로
+# 참고:
+#   - copy_dir source는 '/'로 끝나야 한다.
+#   - 중복 destination과 '..' segment는 거부된다.
+#   - docs/_archive/는 `.gitkeep`만 포함한 clean scaffold로 seed하고 source history는 제외한다.
+#   - docs/_indexes/는 INDEX_GUIDE와 clean generated index 파일만 seed한다.
+#     target project는 `harness kb-index`로 index 내용을 재생성한다.
+#   - docs/01_plan ~ docs/04_report는 README.md만 seed한다.
+#     workflow artifact는 target project가 생성한다.
+#   - docs/10_domain ~ docs/50_operations는 하위 tree 전체를 seed한다.
+#   - docs/50_operations/releases/*.release-notes.md는 payload에서 제외한다.
+#     source repository release notes는 target project에 적용하지 않는다.
+
+# .harness-helm runtime 기반
+copy      payload/.harness-helm/h2-cartridge.yml                   .harness-helm/h2-cartridge.yml
+copy      payload/.harness-helm/h2-schema.yml                      .harness-helm/h2-schema.yml
+copy      payload/.harness-helm/scripts/harness.py                 .harness-helm/scripts/harness.py
+copy      payload/.harness-helm/scripts/harness                    .harness-helm/scripts/harness
+copy      payload/.harness-helm/scripts/kb-index.sh                .harness-helm/scripts/kb-index.sh
+copy      payload/.harness-helm/scripts/kb-lint.sh                 .harness-helm/scripts/kb-lint.sh
+copy      payload/.harness-helm/scripts/kb-stale.sh                .harness-helm/scripts/kb-stale.sh
+copy_dir  payload/.harness-helm/runs/_templates/                   .harness-helm/runs/_templates/
+
+# Claude Code adapter surface
+copy_dir  payload/.claude/commands/h2/                             .claude/commands/h2/
+copy      payload/.claude/skills/harness-helm/SKILL.md             .claude/skills/harness-helm/SKILL.md
+copy_dir  payload/.claude/skills/harness-helm/references/          .claude/skills/harness-helm/references/
+
+# Codex adapter surface
+copy_dir  payload/.codex/skills/h2/                                .codex/skills/h2/
+copy      payload/.codex/skills/harness-helm/SKILL.md              .codex/skills/harness-helm/SKILL.md
+copy_dir  payload/.codex/skills/harness-helm/references/           .codex/skills/harness-helm/references/
+
+# docs template (`harness new-doc`에서 사용)
+copy_dir  payload/docs/_templates/                                 docs/_templates/
+copy      payload/docs/_archive/.gitkeep                           docs/_archive/.gitkeep
+copy      payload/docs/_indexes/INDEX_GUIDE.md                     docs/_indexes/INDEX_GUIDE.md
+copy      payload/docs/_indexes/KB_INDEX.md                        docs/_indexes/KB_INDEX.md
+copy      payload/docs/_indexes/DOMAIN_INDEX.md                    docs/_indexes/DOMAIN_INDEX.md
+copy      payload/docs/_indexes/TAG_INDEX.md                       docs/_indexes/TAG_INDEX.md
+
+# PDCA 작업 영역: phase folder와 README.md만 포함
+copy      payload/docs/01_plan/README.md                           docs/01_plan/README.md
+copy      payload/docs/02_design/README.md                         docs/02_design/README.md
+copy      payload/docs/03_review/README.md                         docs/03_review/README.md
+copy      payload/docs/04_report/README.md                         docs/04_report/README.md
+
+# 기준 knowledge / operations seed
+copy_dir  payload/docs/10_domain/                                  docs/10_domain/
+copy_dir  payload/docs/20_specs/                                   docs/20_specs/
+copy_dir  payload/docs/30_decisions/                               docs/30_decisions/
+copy_dir  payload/docs/40_knowledge/                               docs/40_knowledge/
+copy_dir  payload/docs/50_operations/                              docs/50_operations/
+
+# root managed surface (raw copy가 아니라 managed-block merge)
+managed   templates/AGENTS.md.managed                              AGENTS.md
+managed   templates/AGENTS.ko.md.managed                           AGENTS.ko.md
+managed   templates/CLAUDE.md.managed                              CLAUDE.md
+managed   templates/CLAUDE.ko.md.managed                           CLAUDE.ko.md

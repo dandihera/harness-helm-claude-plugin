@@ -1,0 +1,12 @@
+<!-- This block is managed by the harness-helm installer. Do not edit between the markers. -->
+
+## harness-helm (Claude Code)
+
+- Slash commands: `/h2:plan`, `/h2:design`, `/h2:analysis`, `/h2:build`, `/h2:test`, `/h2:review`, `/h2:report`, `/h2:compound`, `/h2:archive`, `/h2:ops`, `/h2:context`, `/h2:cartridge`.
+- Skill source of truth: `.claude/skills/harness-helm/SKILL.md` (bundled `references/*.md` for compact loading).
+- Command aliases: `.claude/commands/h2/*.md` — thin slash-command aliases only.
+- Runtime mapping: `.harness-helm/h2-cartridge.yml` is the editable provider/surface/fallback/routing source.
+- Claude Code follows `AGENTS.md` as the root guide.
+- Keep same-folder Claude root guides in sync. When `CLAUDE.md` or `CLAUDE.ko.md` changes, update the other file with the matching meaning.
+
+Re-running the installer is idempotent and only updates content between the harness-helm managed markers.

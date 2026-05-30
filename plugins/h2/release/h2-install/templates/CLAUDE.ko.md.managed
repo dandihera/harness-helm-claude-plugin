@@ -1,0 +1,12 @@
+<!-- 이 블록은 harness-helm installer가 관리합니다. marker 사이의 내용은 직접 수정하지 마세요. -->
+
+## harness-helm (Claude Code)
+
+- Slash commands: `/h2:plan`, `/h2:design`, `/h2:analysis`, `/h2:build`, `/h2:test`, `/h2:review`, `/h2:report`, `/h2:compound`, `/h2:archive`, `/h2:ops`, `/h2:context`, `/h2:cartridge`.
+- Skill source of truth: `.claude/skills/harness-helm/SKILL.md` (compact loading을 위한 bundled `references/*.md` 포함).
+- Command aliases: `.claude/commands/h2/*.md` — 얇은 slash-command alias만 둡니다.
+- Runtime mapping: `.harness-helm/h2-cartridge.yml`은 provider/surface/fallback/routing을 수정하는 editable source입니다.
+- Claude Code는 루트 가이드로 `AGENTS.md`를 따릅니다.
+- 같은 폴더의 Claude 루트 가이드는 동기화합니다. `CLAUDE.md` 또는 `CLAUDE.ko.md`가 바뀌면 다른 파일에도 같은 의미를 반영합니다.
+
+installer 재실행은 idempotent하며 harness-helm managed marker 사이의 내용만 갱신합니다.

@@ -1,0 +1,270 @@
+# ============================================================================
+# harness-helm validation schema (frontmatter·문서 정책 단일 소스)
+# ============================================================================
+# 이 파일은 docs/ 아래 모든 markdown 문서가 따라야 하는 frontmatter 규칙과
+# kb-lint·template-validate·archive 같은 harness 명령이 사용하는 검증 정책을 정의한다.
+#
+# 소스 cookbook (변경 시 본 파일과 함께 갱신):
+#   - cookbooks/0100-knowledge-base-foundation/0102-frontmatter-schema.md
+#       frontmatter 필수 필드·enum 정책
+#   - cookbooks/0100-knowledge-base-foundation/0103-retrieval-policy.md
+#       검색·인덱싱 정책과 exclude_paths 의미
+#   - cookbooks/0300-workflow-contract/0301-core-workflow-spec.md
+#       command 산출물·status 의미
+#   - cookbooks/0500-enforcement/0501-enforcement-policy.md
+#   - cookbooks/0500-enforcement/0502-enforcement-implementation.md
+#       lint·검증 enforcement 절차
+#
+# 검증:
+#   .harness-helm/scripts/harness kb-lint --strict
+#   .harness-helm/scripts/harness template-validate --strict
+#
+# 기준 위계:
+#   cookbook(기준 정의) > 이 파일(실행 기준) > docs/_templates/*(런타임 사용처)
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# required_fields: 문서 frontmatter 필수 필드
+# ----------------------------------------------------------------------------
+# 모든 docs/ 문서가 반드시 가져야 하는 frontmatter 필드 목록.
+# kb-lint가 누락을 hard_error로 검출한다.
+# default 키는 type별 override가 없을 때 사용된다.
+#
+# related/source_references 경계:
+#   - related는 target project runtime에도 존재하는 문서, trace, PR, ADR, 실행 surface만 담는다.
+#   - target project에는 cookbooks/가 설치되지 않으므로 related에서 cookbooks/** 참조는 금지한다.
+#   - harness-helm source repository에서만 필요한 cookbook 근거는 optional source_references에 둔다.
+required_fields:
+  default:
+    # 문서 종류 — enums.type 값 중 하나여야 한다.
+    - type
+    # 문서 상태 — enums.status 값 중 하나여야 한다.
+    - status
+    # 보안 분류 — enums.security 값 중 하나여야 한다.
+    - security
+
+# ----------------------------------------------------------------------------
+# enums: 필드별 허용값 정의
+# ----------------------------------------------------------------------------
+# frontmatter에서 사용되는 4개 enum 필드의 허용 목록.
+# 목록에 없는 값을 사용하면 kb-lint가 hard_error로 거부한다.
+enums:
+
+  # type: 문서 종류. docs/_templates/ 아래 동일 이름의 템플릿이 매핑된다.
+  type:
+    # --- 0301 workflow command 산출물 타입 ---
+    # 목표·scope·done 기준 (docs/01_plan/)
+    - plan
+    # 구현 흐름·인터페이스·검증 전략 (docs/02_design/)
+    - design
+    # plan/design consistency 검토 (docs/02_design/)
+    - analysis
+    # code/qa/security/cross review (docs/03_review/)
+    - review
+    # 작업 결과·승격 후보 정리 (docs/04_report/)
+    - report
+    # --- canonical knowledge 타입 ---
+    # ADR — 단일 결정 기록 (docs/30_decisions/)
+    - decision
+    # 도메인 개념·용어 (docs/10_domain/)
+    - domain
+    # 제품·계약 명세 (docs/20_specs/)
+    - spec
+    # 해결 패턴 (docs/40_knowledge/)
+    - solution
+    # 코딩·문서 규약 (docs/40_knowledge/)
+    - convention
+    # 학습 기록 (docs/40_knowledge/)
+    - learning
+    # --- operations 타입 (docs/50_operations/) ---
+    # 운영 절차
+    - runbook
+    # 인시던트 기록
+    - incident
+    # 릴리스 노트
+    - release
+  # status: 문서 상태. type별로 사용 가능한 상태가 다르다.
+  # 0103 retrieval policy가 status별 검색 우선순위를 정의한다.
+  status:
+    # --- 진행 중 상태 ---
+    # 작성 중 (stale_days.draft = 30일)
+    - draft
+    # 검토 대기 (stale_days.pending = 14일)
+    - pending
+    # 미해결 (주로 incident)
+    - open
+    # --- 결정 상태 (주로 decision 문서) ---
+    # 승인됨
+    - accepted
+    # 거부됨
+    - rejected
+    # --- 완료 계열 ---
+    # 검증됨 (주로 canonical knowledge 타입)
+    - verified
+    # 안정 (주로 spec/domain)
+    - stable
+    # 활성 (주로 runbook)
+    - active
+    # 완료 (주로 plan/design/report)
+    - done
+    # 완료 대체 표기
+    - completed
+    # 완료 대체 표기
+    - complete
+    # --- 운영 상태 ---
+    # 완화됨 (incident)
+    - mitigated
+    # 해결됨 (incident)
+    - resolved
+    # 리뷰 완료
+    - reviewed
+    # 릴리스됨 (release)
+    - released
+    # --- 종료 상태 ---
+    # 후속 문서로 대체됨
+    - superseded
+    # 사용 중단
+    - deprecated
+    # archive 이동됨
+    - archived
+
+  # security: 보안 분류. 위에서 아래로 갈수록 제한이 강해진다.
+  # 0103 retrieval policy가 security별 검색·노출 정책을 정의한다.
+  security:
+    # 외부 공개 가능
+    - public
+    # 조직 내부용 (기본값으로 많이 쓰임)
+    - internal
+    # 제한된 사용자
+    - restricted
+    # 규제 대상 (감사 추적 필요)
+    - regulated
+    # 기밀
+    - confidential
+
+  # confidence: 문서 정확도에 대한 작성자 신뢰도.
+  # high인 경우 confidence_high_evidence_fields 중 최소 하나가 함께 있어야 한다.
+  confidence:
+    - low
+    - medium
+    - high
+
+# ----------------------------------------------------------------------------
+# decision_status_by_suffix: decision 파일명 suffix → status 매핑
+# ----------------------------------------------------------------------------
+# decision 문서(ADR)는 파일명 suffix로 status를 추론한다.
+# 예: ADR-0001-pending.md → frontmatter status: pending
+# new-doc decision 명령이 ADR id를 생성할 때 이 매핑을 사용한다.
+decision_status_by_suffix:
+  draft: draft
+  pending: pending
+  accepted: accepted
+  rejected: rejected
+
+# ----------------------------------------------------------------------------
+# confidence_high_evidence_fields: confidence: high일 때 필요한 evidence 필드
+# ----------------------------------------------------------------------------
+# 문서가 confidence: high를 선언하면, 아래 필드 중 최소 하나가 frontmatter에
+# 함께 있어야 한다. 그렇지 않으면 kb-lint가 hard_error로 거부한다.
+# 근거 없는 "high" 자칭을 방지하기 위한 강제 정책이다.
+confidence_high_evidence_fields:
+  # 사람이 검증한 기록 (검토자 이름·날짜)
+  - human_verified_by
+  # 자동화된 테스트로 검증
+  - tests
+  # 근거 PR 링크
+  - source_pr
+  # 과거 issue·외부 시스템 trace
+  - source_trace
+
+# ----------------------------------------------------------------------------
+# generated_header: 자동 생성 문서의 마커 헤더
+# ----------------------------------------------------------------------------
+# kb-index 같은 자동 생성 스크립트가 문서 상단에 박는 마커.
+# 사람이 수정하지 말라는 신호이며, 헤더가 있는 파일은 lint·archive에서 별도 처리된다.
+generated_header: "<!-- AUTO-GENERATED: do not edit manually. Run .harness-helm/scripts/kb-index.sh. -->"
+
+# ----------------------------------------------------------------------------
+# domain_slugs: 허용된 domain slug 목록
+# ----------------------------------------------------------------------------
+# 문서 frontmatter의 module/domain 필드와 docs/10_domain/ 경로에 쓰이는 허용 slug.
+# 목록에 없는 값을 쓰면 kb-lint가 거부한다.
+# 신규 도메인이 필요하면 본 목록과 cookbook 0102를 함께 갱신한다.
+domain_slugs:
+  # 보험 도메인
+  - insurance
+  # 수수료 도메인
+  - commission
+  # 인사 도메인
+  - hrm
+  # 워크플로 도메인
+  - workflow
+  # 통합 도메인
+  - integration
+
+# ----------------------------------------------------------------------------
+# module_slugs: 허용된 module slug 목록
+# ----------------------------------------------------------------------------
+# docs frontmatter의 module 필드에서 사용할 수 있는 module slug.
+# 신규 module이 필요하면 본 목록과 cookbook 0102를 함께 갱신한다.
+module_slugs:
+  - bootstrap-system
+  - bootstrap-human-resource-mng
+  - bootstrap-workflow
+  - hera-webapp
+  - hera-system
+  - hera-human-resource-mng
+  - hera-workflow
+  - hera-domain-data
+  - hera-api-client
+  - hera-commons
+  - _msa-api-gateway
+  - _msa-service-discovery
+  - _system-doctor
+  - _hera-code-gen
+  - docs
+  - workflow
+  - infra
+  - cross-cutting
+
+# ----------------------------------------------------------------------------
+# stale_days: 상태별 stale 판정 일수
+# ----------------------------------------------------------------------------
+# 마지막 updated_at으로부터 경과한 일수가 임계값을 넘으면 stale 경고가 발생한다.
+# archive·sweep 명령이 이 값을 사용해 처리 후보를 산출한다.
+stale_days:
+  # draft 문서: 30일 이내 갱신 필요
+  draft: 30
+  # pending 문서: 14일 이내 결정 필요
+  pending: 14
+  # .harness-helm/runs/{feature}/{run-id}/ 산출물 (검증 전): 7일
+  harness_raw: 7
+  # 정규화된 harness 산출물: 30일
+  harness_normalized: 30
+
+# ----------------------------------------------------------------------------
+# exclude_paths: lint·index에서 제외할 경로 패턴
+# ----------------------------------------------------------------------------
+# glob 패턴으로 일치하는 파일은 frontmatter lint와 KB 인덱싱에서 제외된다.
+# 주로 템플릿·자동 생성 README·runtime staging이 해당한다.
+exclude_paths:
+  lint_index:
+    # 문서 템플릿 자체는 frontmatter placeholder를 포함하므로 lint 제외
+    - docs/_templates/**
+    # docs 폴더별 README는 자동 생성·안내문이므로 lint 제외
+    - docs/01_plan/README.md
+    - docs/02_design/README.md
+    - docs/03_review/README.md
+    - docs/04_report/README.md
+    - docs/10_domain/README.md
+    - docs/20_specs/README.md
+    - docs/30_decisions/README.md
+    - docs/40_knowledge/README.md
+    - docs/50_operations/README.md
+    # 40_knowledge·50_operations는 subtype 폴더별 README 모두 제외
+    - docs/40_knowledge/**/README.md
+    - docs/50_operations/**/README.md
+    # _indexes 폴더 자체는 자동 생성이지만 index guide는 사람이 만든 docs이므로 lint 제외
+    - docs/_indexes/INDEX_GUIDE.md
+    # harness staging 산출물 템플릿은 정식 docs가 아니므로 제외
+    - .harness-helm/runs/_templates/**
