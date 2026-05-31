@@ -18,7 +18,7 @@ Claude Code와 Codex는 서로 다른 command surface를 제공하지만, h2 com
 - Common input meaning: `command`, `feature`, `task`, optional `source_request`, `references`, `constraints`.
 - Common output meaning: `context_pack`, `artifacts`, `routing`, `verification`, `next`.
 - Routing은 `.harness-helm/h2-cartridge.yml`이 설치되어 있으면 그 파일과 일치해야 합니다.
-- `.harness-helm/h2-cartridge.yml`이 없으면 `references/upstream-tool-invocation.md`를 compact runtime mapping으로 사용합니다.
+- `.harness-helm/h2-cartridge.yml`이 없으면 `references/cartridge-command-mapping.md`를 compact runtime mapping으로 사용합니다.
 - Fallback-only check를 actual upstream invocation으로 기록하지 않습니다.
 
 ## Upstream Invocation Parity

@@ -1,10 +1,10 @@
 # Specs vs Decisions Reference
 
-`docs/40_knowledge/conventions/guidelines/h2-specs-vs-decisions.md`의 압축 runtime snapshot입니다.
+`docs/40_knowledge/conventions/guidelines/harness-helm/specs-vs-decisions.md`의 압축 runtime snapshot입니다.
 
-전체 공식 기준 지침은 `docs/40_knowledge/conventions/guidelines/h2-specs-vs-decisions.md`를 확인합니다.
+전체 공식 기준 지침은 `docs/40_knowledge/conventions/guidelines/harness-helm/specs-vs-decisions.md`를 확인합니다.
 
-Mapping 기준 정의 위치: `docs/40_knowledge/conventions/guidelines/h2-runtime-reference-selection.md`.
+Mapping 기준 정의 위치: `docs/40_knowledge/conventions/guidelines/harness-helm/runtime-reference-selection.md`.
 
 ## 규칙
 

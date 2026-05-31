@@ -27,6 +27,32 @@ next:
   - <TODO: 후보 1 경로 또는 요약>
   - <TODO: 후보 2>
 
+## Compound Policy
+
+이 섹션은 `compound-candidates.md` 안의 template-local 기록이다. 공통 h2 output field를 새로 추가하지 않는다. 아래 YAML block은 frontmatter가 아니라 본문 기록이며, 이번 run에 적용된 effective compound policy와 run-level override를 남긴다.
+
+```yaml
+compound_policy:
+  source: .harness-helm/h2-compound.yml | built-in-default
+  mode: conservative | synthesis | exploratory
+  overrides:
+    mode: null
+    destination: null
+  canonical_destination:
+    domain_rule: docs/10_domain
+    implementation_pattern: docs/40_knowledge/solutions
+    convention: docs/40_knowledge/conventions
+    operational_rule: docs/50_operations
+  review_gate:
+    low_risk_auto_write: true
+    governed_require_approval: true
+    confidence_threshold: high
+  retrieval_hook_policy:
+    required: [domain, module, tags]
+    recommended: [applies_to, retrieval_triggers, related]
+    enforcement: warn
+```
+
 ## Knowledge Candidates (low-risk)
 
 이 섹션은 `compound-candidates.md` 안의 template-local 기록이다. 공통 h2 output field를 새로 추가하지 않는다.
@@ -35,6 +61,7 @@ next:
 knowledge_candidates:
   - target: docs/40_knowledge/solutions/<topic>.md
     governance_level: low-risk
+    generated_by: h2-compound
     overlap:
       score: low | moderate | high
       matched_docs: []

@@ -1,18 +1,18 @@
 # ============================================================================
 # harness-helm h2 cartridge mapping (Single Source of Truth)
 # ============================================================================
-# 이 파일은 12개 `h2-*` command 각각이 어떤 upstream provider/surface를
+# 이 파일은 14개 `h2-*` command 각각이 어떤 upstream provider/surface를
 # 호출하고, 호출 실패 시 어떤 fallback label과 routing target을 쓸지 정의한다.
 #
 # 소스 cookbook (변경 시 본 파일과 함께 갱신):
 #   - cookbooks/0300-workflow-contract/0303-workflow-lifecycle-commands.md
 #       command lifecycle 순서와 산출 의미
-#   - cookbooks/0600-upstream-integration/0601-upstream-tool-invocation.md
+#   - cookbooks/0600-cartridge/0601-cartridge-command-mapping.md
 #       command별 provider/surface/fallback/routing 호출 계약
-#   - cookbooks/0600-upstream-integration/0602-upstream-tool-registry.md
+#   - cookbooks/0600-cartridge/0602-external-tool-registry.md
 #       upstream tool registry 필드 정의·등록 절차
-#   - cookbooks/0600-upstream-integration/0603-upstream-surface-map.md
-#       12 command × 3 provider 후보 매트릭스와 정책 전환 근거
+#   - cookbooks/0600-cartridge/0603-cartridge-surface-map.md
+#       command × provider 후보 매트릭스와 정책 전환 근거
 #
 # 검증:
 #   .harness-helm/scripts/harness cartridge-validate --strict
@@ -66,8 +66,8 @@ external_tool_registry:
   semantics_boundary: "Registry entries select execution targets only; they do not change 0301-core-workflow-spec h2 command semantics."
 
   # 책임 경계 2: command별 provider/surface/fallback/routing은 commands.* 블록이 보유한다.
-  # 0601-upstream-tool-invocation 호환성을 위해 이 분리를 유지한다.
-  invocation_boundary: "Command-level provider/surface/fallback/routing remains under commands.* for 0601-upstream-tool-invocation compatibility."
+  # 0601-cartridge-command-mapping 호환성을 위해 이 분리를 유지한다.
+  invocation_boundary: "Command-level provider/surface/fallback/routing remains under commands.* for 0601-cartridge-command-mapping compatibility."
 
   # --------------------------------------------------------------------------
   # tools: 도구별 정의 블록
@@ -213,17 +213,17 @@ external_tool_registry:
 
 
 # ============================================================================
-# commands: 12개 h2-* command별 실행 매핑
+# commands: 14개 h2-* command별 실행 매핑
 # ============================================================================
 # 각 command는 아래 5개 필드로 정의된다.
 #   mode             command의 실행 모드 (context-pack/cartridge/recorder/validator 등)
 #   provider         primary upstream provider (또는 harness 자신)
 #   surface          provider가 노출하는 구체 skill/command 식별자
 #   alternatives     primary 미사용 시 시도할 다음 surface 우선순위
-#   fallback_label   모든 surface가 미사용일 때 verification.completed에 남길 라벨
+#   fallback_label   모든 surface가 미사용이거나 prerequisite이 없을 때 남길 fallback/block 라벨
 #   routing_target   command 결과물이 저장될 경로 템플릿
 #
-# {feature}, {run-id}, {type}, {topic} placeholder는 h2 command가 실행 시점에 치환한다.
+# {feature}, {run-id}, {type}, {topic}, {step} placeholder는 h2 command가 실행 시점에 치환한다.
 # ============================================================================
 commands:
 
@@ -277,6 +277,31 @@ commands:
     routing_target: docs/02_design/{feature}.md
 
   # --------------------------------------------------------------------------
+  # h2-autorun: h2-design 이후 lifecycle command를 자동 순차 실행한다.
+  # 각 하위 command의 의미와 routing은 그대로 유지하고, status/next/not_verified
+  # 신호를 읽어 진행·중단·경고만 판단하는 adapter-level orchestrator다.
+  # --------------------------------------------------------------------------
+  h2-autorun:
+    mode: orchestrator
+    provider: harness
+    surface: autorun-orchestrator
+    alternatives: []
+    fallback_label: cartridge-checklist-fallback:autorun-summary
+    routing_target: .harness-helm/runs/{feature}/{run-id}/autorun-summary.md
+
+  # --------------------------------------------------------------------------
+  # h2-rewind: h2-autorun이 남긴 단계별 pre-step snapshot으로 특정 단계 직전
+  # 상태를 복원한다. Snapshot이 없으면 fallback 진행이 아니라 blocked 처리한다.
+  # --------------------------------------------------------------------------
+  h2-rewind:
+    mode: recovery
+    provider: harness
+    surface: snapshot-restore
+    alternatives: []
+    fallback_label: blocked:no-snapshot
+    routing_target: .harness-helm/runs/{feature}/{run-id}/snapshots/{step}/restore.md
+
+  # --------------------------------------------------------------------------
   # h2-analysis: plan/design consistency·risk·test coverage gap 점검.
   # harness의 internal checklist가 primary. 외부 surface는 보조.
   # --------------------------------------------------------------------------
@@ -288,7 +313,7 @@ commands:
       - gstack-plan-eng-review
       - verification-before-completion
     fallback_label: verified-fallback:gstack-superpowers-consistency-checklist
-    routing_target: docs/02_design/{feature}.md
+    routing_target: docs/02_design/{feature}.analysis.md
 
   # --------------------------------------------------------------------------
   # h2-build: design 실행 산출물·변경 파일·리스크를 기록한다.

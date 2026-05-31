@@ -1,10 +1,10 @@
 # Specs vs Decisions Reference
 
-Compact runtime snapshot of `docs/40_knowledge/conventions/guidelines/h2-specs-vs-decisions.md`.
+Compact runtime snapshot of `docs/40_knowledge/conventions/guidelines/harness-helm/specs-vs-decisions.md`.
 
-For the full canonical guideline, see `docs/40_knowledge/conventions/guidelines/h2-specs-vs-decisions.md`.
+For the full canonical guideline, see `docs/40_knowledge/conventions/guidelines/harness-helm/specs-vs-decisions.md`.
 
-Mapping authority: `docs/40_knowledge/conventions/guidelines/h2-runtime-reference-selection.md`.
+Mapping authority: `docs/40_knowledge/conventions/guidelines/harness-helm/runtime-reference-selection.md`.
 
 ## Rule
 

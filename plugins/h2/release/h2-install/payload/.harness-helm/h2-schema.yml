@@ -7,7 +7,7 @@
 # 소스 cookbook (변경 시 본 파일과 함께 갱신):
 #   - cookbooks/0100-knowledge-base-foundation/0102-frontmatter-schema.md
 #       frontmatter 필수 필드·enum 정책
-#   - cookbooks/0100-knowledge-base-foundation/0103-retrieval-policy.md
+#   - cookbooks/0100-knowledge-base-foundation/0103-retrieval-and-index-policy.md
 #       검색·인덱싱 정책과 exclude_paths 의미
 #   - cookbooks/0300-workflow-contract/0301-core-workflow-spec.md
 #       command 산출물·status 의미
@@ -84,7 +84,7 @@ enums:
     # 릴리스 노트
     - release
   # status: 문서 상태. type별로 사용 가능한 상태가 다르다.
-  # 0103 retrieval policy가 status별 검색 우선순위를 정의한다.
+  # 0103 Retrieval and Index Policy가 status별 검색 우선순위를 정의한다.
   status:
     # --- 진행 중 상태 ---
     # 작성 중 (stale_days.draft = 30일)
@@ -129,7 +129,7 @@ enums:
     - archived
 
   # security: 보안 분류. 위에서 아래로 갈수록 제한이 강해진다.
-  # 0103 retrieval policy가 security별 검색·노출 정책을 정의한다.
+  # 0103 Retrieval and Index Policy가 security별 검색·노출 정책을 정의한다.
   security:
     # 외부 공개 가능
     - public
@@ -148,6 +148,16 @@ enums:
     - low
     - medium
     - high
+
+  # target_runtime: release/install payload와 문서 원문의 관계.
+  # optional field이며 값이 있으면 kb-lint가 enum을 검증한다.
+  target_runtime:
+    # target payload에 직접 포함되어도 되는 runtime 문서
+    - included
+    # source repository 설계/빌드/운영 문서라 target payload에 직접 포함하지 않는 문서
+    - source_only
+    # target runtime 문서나 snapshot이 이 문서에서 파생되지만 원문 자체는 포함하지 않는 문서
+    - derived
 
 # ----------------------------------------------------------------------------
 # decision_status_by_suffix: decision 파일명 suffix → status 매핑
@@ -264,7 +274,112 @@ exclude_paths:
     # 40_knowledge·50_operations는 subtype 폴더별 README 모두 제외
     - docs/40_knowledge/**/README.md
     - docs/50_operations/**/README.md
-    # _indexes 폴더 자체는 자동 생성이지만 index guide는 사람이 만든 docs이므로 lint 제외
-    - docs/_indexes/INDEX_GUIDE.md
     # harness staging 산출물 템플릿은 정식 docs가 아니므로 제외
     - .harness-helm/runs/_templates/**
+
+# ----------------------------------------------------------------------------
+# compound_policy_schema: .harness-helm/h2-compound.yml 검증 기준
+# ----------------------------------------------------------------------------
+# h2-schema.yml은 docs frontmatter schema의 기준 파일이지만,
+# h2-compound.yml의 shape 검증을 위해 compound policy schema를
+# 별도 top-level block으로 둔다.
+#
+# 책임 경계:
+#   - docs required_fields/enums: 모든 docs/ 문서의 frontmatter 공통 규칙.
+#   - compound_policy_schema:     .harness-helm/h2-compound.yml 파일의
+#     구조·허용 값 선언. docs frontmatter 규칙과 독립적이다.
+#
+# 검증 방식:
+#   - kb-lint가 h2-compound.yml 파일이 존재할 때만 shape 검증을 실행한다.
+#   - 파일이 없으면 검증을 건너뛰고 built-in default를 사용한다.
+#   - 위반은 모두 hard error가 아닌 warning으로 보고한다.
+#
+# 소스 cookbook (변경 시 본 block과 함께 갱신):
+#   - cookbooks/0300-workflow-contract/0304-canonical-promotion-flow.md
+#       destination별 low-risk/governed 승인 경계
+#   - cookbooks/0500-enforcement/0503-h2-runtime-folder-structure.md
+#       .harness-helm/ 파일 목록과 각 파일의 책임
+compound_policy_schema:
+
+  # schema_versions: h2-compound.yml에서 허용하는 schema_version 값 목록.
+  # h2-compound.yml의 최상단 schema_version 필드가 이 목록에 없으면 warning.
+  # 현재 지원 버전은 1이며, 신규 버전 추가 시 이 목록을 함께 갱신한다.
+  schema_versions:
+    - 1
+
+  # modes: domain_refinement.mode 허용 값 목록.
+  # h2-compound가 reusable knowledge 후보를 생성하거나 staging할 때
+  # 어떤 기준으로 정제할지 결정한다. 목록에 없는 mode는 kb-lint가 warning을 낸다.
+  #
+  # 값별 의미:
+  #   conservative  검증된 명시 지식만 canonical 후보로 승격한다.
+  #                 가장 엄격하며 오탐이 가장 적다.
+  #   synthesis     여러 작업 산출물에서 반복 패턴을 요약해
+  #                 도메인 지식 후보로 추출한다.
+  #   exploratory   아직 확정되지 않은 가설·관찰도 learning 또는
+  #                 pending knowledge로 기록한다.
+  #
+  # 주의: mode는 h2-compound 후보 생성 정책에만 영향을 준다.
+  #       h2-context retrieval selection을 직접 바꾸지 않는다.
+  modes:
+    - conservative
+    - synthesis
+    - exploratory
+
+  # destination_keys: canonical_destination 섹션에서 사용할 수 있는 key 목록.
+  # h2-compound가 후보 문서를 어떤 canonical 경로로 보낼지 결정할 때 참조한다.
+  # 목록에 없는 key가 h2-compound.yml에 있으면 kb-lint가 unknown key warning을 낸다.
+  #
+  # 값별 의미:
+  #   domain_rule             도메인 개념·용어 → docs/10_domain
+  #   implementation_pattern  재사용 가능한 구현 패턴 → docs/40_knowledge/solutions
+  #   convention              워크플로·제품 규약 → docs/40_knowledge/conventions
+  #   operational_rule        운영 절차·정책 → docs/50_operations
+  #
+  # 주의: destination 경로는 절대 경로이거나 ..를 포함하면 warning.
+  #       actual 경로 값은 h2-compound.yml 파일에서 자유롭게 설정하되,
+  #       이 key 목록으로 허용된 key 이름인지만 여기서 검증한다.
+  destination_keys:
+    - domain_rule
+    - implementation_pattern
+    - convention
+    - operational_rule
+
+  # enforcement: retrieval_hook_policy.enforcement 허용 값 목록.
+  # h2-compound가 생성·staging한 문서가 retrieval_hook_policy.required 필드를
+  # 갖추지 못했을 때 kb-lint의 반응 수준을 결정한다.
+  #
+  # 값별 의미:
+  #   warn   요건 미충족을 warning으로만 보고한다. workflow는 계속 진행된다.
+  #   error  설정 값으로는 허용되지만, 현재 scope에서 hard error로 동작하지 않는다.
+  #          설정에 error가 있어도 kb-lint는 warn 수준으로 낮춰 보고한다.
+  #          hard enforcement 전환은 후속 이슈(Issue #73 follow-up)로 남긴다.
+  enforcement:
+    - warn
+    - error
+
+  # retrieval_hook_fields: retrieval_hook_policy.required 및 recommended에서
+  # 사용할 수 있는 frontmatter 필드 이름 목록.
+  # h2-compound.yml의 required/recommended 배열에 이 목록에 없는 값이 있으면
+  # kb-lint가 unknown field warning을 낸다.
+  #
+  # 값별 의미:
+  #   domain             문서가 속한 비즈니스 도메인 슬러그.
+  #   module             문서가 속한 기술 모듈 슬러그.
+  #   tags               검색 보조 신호 배열. status/security보다 우선하지 않는다.
+  #   applies_to         이 지식이 적용되는 컨텍스트나 조건.
+  #   retrieval_triggers h2-context가 이 문서를 재발견하는 데 쓸 키워드·조건.
+  #   related            관련 문서·결정·ADR 경로 목록.
+  #
+  # required vs recommended 분리 기준:
+  #   required   h2-compound generated/staged 문서가 반드시 갖춰야 한다.
+  #              현재 기본 required: [domain, module, tags]
+  #   recommended 있으면 retrieval 품질이 높아지지만 없어도 warning만 낸다.
+  #              현재 기본 recommended: [applies_to, retrieval_triggers, related]
+  retrieval_hook_fields:
+    - domain
+    - module
+    - tags
+    - applies_to
+    - retrieval_triggers
+    - related

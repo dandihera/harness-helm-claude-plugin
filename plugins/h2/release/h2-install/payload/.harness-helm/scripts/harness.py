@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import dataclasses
 import datetime as dt
 import fnmatch
+import hashlib
+import json
 import os
 import re
 import shutil
@@ -20,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DOCS = ROOT / "docs"
 SCHEMA_PATH = ROOT / ".harness-helm" / "h2-schema.yml"
 CARTRIDGE_PATH = ROOT / ".harness-helm" / "h2-cartridge.yml"
+COMPOUND_POLICY_PATH = ROOT / ".harness-helm" / "h2-compound.yml"
 DEFAULT_GENERATED_HEADER = "<!-- AUTO-GENERATED: do not edit manually. Run .harness-helm/scripts/kb-index.sh. -->"
 CANONICAL_TEMPLATES = {
     "plan": "plan.md",
@@ -57,7 +61,6 @@ REQUIRED_LINT_INDEX_EXCLUDES = {
     "docs/30_decisions/README.md",
     "docs/40_knowledge/**/README.md",
     "docs/50_operations/**/README.md",
-    "docs/_indexes/INDEX_GUIDE.md",
 }
 TEMPLATE_TARGETS = {
     "plan": "docs/01_plan/{feature}.md",
@@ -80,13 +83,15 @@ LOG_END = "=== [DANDI] :: Harness Helm (__end__) ==="
 RUN_ID_PATTERN = re.compile(r"^\d{8}-\d{6}-h2-[a-z][a-z0-9-]*$")
 DECISION_SUFFIX_PATTERN = re.compile(r"\.([a-z][a-z0-9_-]*)\.md$")
 ROUTING_PLACEHOLDER_PATTERN = re.compile(r"{([^{}]+)}")
-ALLOWED_ROUTING_PLACEHOLDERS = {"feature", "run-id", "type", "topic"}
+ALLOWED_ROUTING_PLACEHOLDERS = {"feature", "run-id", "type", "topic", "step"}
 # This list is the cartridge/reference validation surface, not a 1:1 list of
 # local CLI subcommands. Only h2-context is directly implemented by harness.py.
 EXPECTED_COMMANDS = {
     "h2-context",
     "h2-plan",
     "h2-design",
+    "h2-autorun",
+    "h2-rewind",
     "h2-analysis",
     "h2-report",
     "h2-cartridge",
@@ -97,31 +102,132 @@ EXPECTED_COMMANDS = {
     "h2-archive",
     "h2-ops",
 }
+REWINDABLE_STEPS = {
+    "h2-analysis",
+    "h2-build",
+    "h2-test",
+    "h2-review",
+    "h2-report",
+    "h2-compound",
+    "h2-archive",
+}
+STEP_SNAPSHOT_SCOPE: dict[str, list[str]] = {
+    "h2-analysis": [
+        "docs/02_design/{feature}.analysis.md",
+    ],
+    "h2-build": [
+        ".harness-helm/runs/{feature}/{run_id}/build.md",
+    ],
+    "h2-test": [
+        ".harness-helm/runs/{feature}/{run_id}/test.md",
+    ],
+    "h2-review": [
+        "docs/03_review/code/{feature}.md",
+        "docs/03_review/qa/{feature}.md",
+        "docs/03_review/security/{feature}.md",
+        "docs/03_review/cross/{feature}.md",
+    ],
+    "h2-report": [
+        "docs/04_report/{feature}.md",
+    ],
+    "h2-compound": [
+        ".harness-helm/runs/{feature}/{run_id}/compound-candidates.md",
+    ],
+    "h2-archive": [
+        "docs/01_plan/{feature}.md",
+        "docs/02_design/{feature}.md",
+        "docs/02_design/{feature}.analysis.md",
+        "docs/03_review/code/{feature}.md",
+        "docs/03_review/qa/{feature}.md",
+        "docs/03_review/security/{feature}.md",
+        "docs/03_review/cross/{feature}.md",
+        "docs/04_report/{feature}.md",
+    ],
+}
 H2_CLI_NOTE = (
-    "Note: among the 12 h2-* lifecycle commands, only h2-context is directly "
+    "Note: among the h2-* lifecycle commands, only h2-context is directly "
     "implemented by this CLI. Use .claude/commands/h2/*, the Codex h2 skill, "
     "or .harness-helm/h2-cartridge.yml mappings for the other h2-* commands."
 )
 COMMON_H2_OUTPUT_SECTIONS = {"Context Pack", "Artifacts", "Routing", "Verification", "Next"}
+CANONICAL_KNOWLEDGE_ROOTS = (
+    "docs/10_domain/",
+    "docs/20_specs/",
+    "docs/30_decisions/",
+    "docs/40_knowledge/",
+    "docs/50_operations/",
+)
+CANONICAL_KNOWLEDGE_LIMIT = 6
+DEFAULT_COMPOUND_POLICY: dict[str, Any] = {
+    "schema_version": 1,
+    "domain_refinement": {
+        "mode": "conservative",
+        "allow_run_override": True,
+    },
+    "canonical_destination": {
+        "domain_rule": "docs/10_domain",
+        "implementation_pattern": "docs/40_knowledge/solutions",
+        "convention": "docs/40_knowledge/conventions",
+        "operational_rule": "docs/50_operations",
+    },
+    "review_gate": {
+        "low_risk_auto_write": True,
+        "governed_require_approval": True,
+        "confidence_threshold": "high",
+    },
+    "retrieval_hook_policy": {
+        "required": ["domain", "module", "tags"],
+        "recommended": ["applies_to", "retrieval_triggers", "related"],
+        "enforcement": "warn",
+    },
+}
 REFERENCE_MANIFEST = {
     "shared": {
+        "canonical-promotion-flow.md": [
+            "docs/40_knowledge/conventions/guidelines/harness-helm/canonical-promotion-flow.md",
+            "docs/40_knowledge/conventions/guidelines/harness-helm/runtime-reference-selection.md",
+        ],
         "core-workflow.md": ["0301 Core Workflow Spec", "h2-context", "h2-plan"],
-        "external-tool-registry.md": ["0602 Upstream Tool Registry", ".harness-helm/h2-cartridge.yml"],
+        "cartridge-tool-registry.md": ["0602 Upstream Tool Registry", ".harness-helm/h2-cartridge.yml"],
         "runtime-parity.md": ["Runtime Parity Report", "Claude Code", "Codex"],
         "skill-suite.md": ["0302 Skill Suite", "harness-helm"],
-        "upstream-output-normalization.md": [
+        "specs-vs-decisions.md": [
+            "docs/40_knowledge/conventions/guidelines/harness-helm/specs-vs-decisions.md",
+            "docs/40_knowledge/conventions/guidelines/harness-helm/runtime-reference-selection.md",
+        ],
+        "provider-surface-selection-and-override.md": [
+            "docs/40_knowledge/conventions/guidelines/harness-helm/provider-surface-selection-and-override.md",
+            "docs/40_knowledge/conventions/guidelines/harness-helm/runtime-reference-selection.md",
+        ],
+        "cartridge-output-normalization.md": [
             "Source cookbook: `0604 Upstream Output Normalization`",
             "not a canonical h2 artifact",
             "actual:<provider>:<surface>",
         ],
-        "upstream-surface-map.md": [
+        "cartridge-surface-map.md": [
             "Source cookbook: `0603 Upstream Surface Map`",
             "h2-design",
             "compound-engineering",
         ],
-        "upstream-tool-invocation.md": [
+        "cartridge-command-mapping.md": [
             "0601 Upstream Tool Invocation",
             ".harness-helm/h2-cartridge.yml",
+        ],
+        "context-pack-contract.md": [
+            "0305 Context Pack Contract",
+            ".harness-helm/runs/{feature}/{run-id}/context-pack.md",
+        ],
+        "runtime-folder-structure.md": [
+            "0503 h2 Runtime Folder Structure",
+            ".harness-helm/runs/{feature}/{run-id}/",
+        ],
+        "compound-policy-config.md": [
+            "0306 Compound Policy Config",
+            ".harness-helm/h2-compound.yml",
+        ],
+        "h2-rewind-recovery.md": [
+            "blocked:no-snapshot",
+            ".harness-helm/runs/{feature}/{run-id}/snapshots/{step}/",
         ],
         "workflow-lifecycle-commands.md": [
             "Source cookbook: `cookbooks/0300-workflow-contract/0303-workflow-lifecycle-commands.md`",
@@ -137,6 +243,13 @@ REFERENCE_MANIFEST = {
         "codex-entrypoint.md": ["Codex Entrypoint Smoke", "$h2 plan"],
     },
 }
+MISLEADING_VALUE_SNAPSHOT_CLAIM = "Compact runtime snapshot of upstream provider, surface, fallback, and routing behavior."
+GUIDELINE_DERIVED_REFERENCE_HEADERS = {
+    "canonical-promotion-flow.md": "docs/40_knowledge/conventions/guidelines/harness-helm/canonical-promotion-flow.md",
+    "specs-vs-decisions.md": "docs/40_knowledge/conventions/guidelines/harness-helm/specs-vs-decisions.md",
+    "provider-surface-selection-and-override.md": "docs/40_knowledge/conventions/guidelines/harness-helm/provider-surface-selection-and-override.md",
+}
+REFERENCE_MAPPING_AUTHORITY = "docs/40_knowledge/conventions/guidelines/harness-helm/runtime-reference-selection.md"
 
 
 @dataclasses.dataclass
@@ -393,6 +506,7 @@ def load_schema() -> dict[str, Any]:
             "status": set(enums.get("status", [])),
             "security": set(enums.get("security", [])),
             "confidence": set(enums.get("confidence", [])),
+            "target_runtime": set(enums.get("target_runtime", [])),
             "domains": set(raw.get("domain_slugs", [])),
             "modules": set(raw.get("module_slugs", [])),
             "decision_status_by_suffix": raw.get("decision_status_by_suffix", {}),
@@ -400,6 +514,7 @@ def load_schema() -> dict[str, Any]:
             "generated_header": raw.get("generated_header", DEFAULT_GENERATED_HEADER),
             "stale_days": raw.get("stale_days", {}),
             "exclude_paths": raw.get("exclude_paths", {}),
+            "compound_policy_schema": raw.get("compound_policy_schema", {}),
         }
 
     # Fallback keeps the command usable if the config file is missing.
@@ -438,6 +553,7 @@ def load_schema() -> dict[str, Any]:
         },
         "security": {"public", "internal", "restricted", "regulated", "confidential"},
         "confidence": {"low", "medium", "high"},
+        "target_runtime": {"included", "source_only", "derived"},
         "domains": {"insurance", "commission", "hrm", "workflow", "integration"},
         "modules": {
             "bootstrap-system",
@@ -468,6 +584,13 @@ def load_schema() -> dict[str, Any]:
         "generated_header": DEFAULT_GENERATED_HEADER,
         "stale_days": {"draft": 30, "pending": 14, "harness_raw": 7, "harness_normalized": 30},
         "exclude_paths": {},
+        "compound_policy_schema": {
+            "schema_versions": [1],
+            "modes": ["conservative", "synthesis", "exploratory"],
+            "destination_keys": ["domain_rule", "implementation_pattern", "convention", "operational_rule"],
+            "enforcement": ["warn", "error"],
+            "retrieval_hook_fields": ["domain", "module", "tags", "applies_to", "retrieval_triggers", "related"],
+        },
     }
 
 
@@ -481,6 +604,8 @@ def has_path_escape(value: str) -> bool:
 
 
 def safe_path_segment(value: str, label: str) -> str:
+    if not value:
+        raise ValueError(f"{label} must not be empty.")
     if has_path_escape(value) or "/" in value or "\\" in value:
         raise ValueError(f"{label} must be a single safe path segment.")
     return value
@@ -503,16 +628,102 @@ def resolve_under_root(rel_path: str, root: Path, label: str) -> Path:
     return resolved
 
 
+def deep_merge(default: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = copy.deepcopy(default)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def load_compound_policy(schema: dict[str, Any]) -> tuple[dict[str, Any], str, list[str]]:
+    if not COMPOUND_POLICY_PATH.exists():
+        return copy.deepcopy(DEFAULT_COMPOUND_POLICY), "built-in-default", []
+
+    raw = parse_simple_yaml(read_text(COMPOUND_POLICY_PATH))
+    policy = deep_merge(DEFAULT_COMPOUND_POLICY, raw)
+    return policy, ".harness-helm/h2-compound.yml", validate_compound_policy(policy, schema)
+
+
+def validate_compound_policy(policy: dict[str, Any], schema: dict[str, Any]) -> list[str]:
+    warnings: list[str] = []
+    policy_schema = schema.get("compound_policy_schema", {})
+    versions = set(list_value(policy_schema.get("schema_versions", [1])))
+    modes = set(list_value(policy_schema.get("modes", ["conservative", "synthesis", "exploratory"])))
+    destination_keys = set(
+        list_value(
+            policy_schema.get(
+                "destination_keys",
+                ["domain_rule", "implementation_pattern", "convention", "operational_rule"],
+            )
+        )
+    )
+    enforcement_values = set(list_value(policy_schema.get("enforcement", ["warn", "error"])))
+
+    version = str(policy.get("schema_version"))
+    if version not in versions:
+        warnings.append(f".harness-helm/h2-compound.yml: unsupported schema_version={version}.")
+
+    refinement = policy.get("domain_refinement", {})
+    if not isinstance(refinement, dict):
+        warnings.append(".harness-helm/h2-compound.yml: domain_refinement must be a mapping.")
+        refinement = {}
+    mode = str(refinement.get("mode", "conservative"))
+    if mode not in modes:
+        warnings.append(f".harness-helm/h2-compound.yml: unknown domain_refinement.mode={mode}.")
+
+    destinations = policy.get("canonical_destination", {})
+    if not isinstance(destinations, dict):
+        warnings.append(".harness-helm/h2-compound.yml: canonical_destination must be a mapping.")
+        destinations = {}
+    for key, value in destinations.items():
+        if key not in destination_keys:
+            warnings.append(f".harness-helm/h2-compound.yml: unknown canonical_destination key={key}.")
+        if not isinstance(value, str) or has_path_escape(value):
+            warnings.append(f".harness-helm/h2-compound.yml: invalid canonical_destination.{key}={value}.")
+
+    review_gate = policy.get("review_gate", {})
+    if not isinstance(review_gate, dict):
+        warnings.append(".harness-helm/h2-compound.yml: review_gate must be a mapping.")
+        review_gate = {}
+    threshold = str(review_gate.get("confidence_threshold", "high"))
+    if threshold not in schema.get("confidence", set()):
+        warnings.append(f".harness-helm/h2-compound.yml: invalid review_gate.confidence_threshold={threshold}.")
+
+    retrieval_policy = policy.get("retrieval_hook_policy", {})
+    if not isinstance(retrieval_policy, dict):
+        warnings.append(".harness-helm/h2-compound.yml: retrieval_hook_policy must be a mapping.")
+        retrieval_policy = {}
+    enforcement = str(retrieval_policy.get("enforcement", "warn"))
+    if enforcement not in enforcement_values:
+        warnings.append(f".harness-helm/h2-compound.yml: invalid retrieval_hook_policy.enforcement={enforcement}.")
+    elif enforcement == "error":
+        warnings.append(".harness-helm/h2-compound.yml: enforcement=error is accepted but downgraded to warning in this scope.")
+    return warnings
+
+
+def is_compound_generated_doc(doc: Doc) -> bool:
+    return doc.frontmatter.get("generated_by") == "h2-compound"
+
+
 def generated_header_ok(doc: Doc, schema: dict[str, Any]) -> bool:
     return read_text(doc.path).startswith(schema["generated_header"])
 
 
 def command_lint(args: argparse.Namespace) -> int:
     schema = load_schema()
+    compound_policy, _compound_policy_source, compound_warnings = load_compound_policy(schema)
     docs = load_docs()
     hard: list[str] = []
-    warnings: list[str] = []
+    warnings: list[str] = list(compound_warnings)
     ids: dict[str, str] = {}
+    retrieval_required = list_value(
+        compound_policy.get("retrieval_hook_policy", {}).get("required", [])
+        if isinstance(compound_policy.get("retrieval_hook_policy"), dict)
+        else []
+    )
 
     for doc in docs:
         fm = doc.frontmatter
@@ -529,7 +740,7 @@ def command_lint(args: argparse.Namespace) -> int:
         missing = [field for field in schema["required"] if field not in fm]
         if missing:
             hard.append(f"{doc.rel}: missing required frontmatter fields: {', '.join(missing)}")
-        for field in ("type", "status", "security", "confidence"):
+        for field in ("type", "status", "security", "confidence", "target_runtime"):
             if field in fm and fm[field] not in schema.get(field, set()):
                 hard.append(f"{doc.rel}: invalid {field}={fm[field]}")
         doc_id = fm.get("id")
@@ -575,6 +786,12 @@ def command_lint(args: argparse.Namespace) -> int:
             warnings.append(f"{doc.rel}: tags missing; TAG_INDEX routing may be weak.")
         if not (fm.get("source_trace") or fm.get("source_pr")) and fm.get("type") in {"plan", "design", "analysis", "report"}:
             warnings.append(f"{doc.rel}: PDCA doc has no source_trace/source_pr.")
+        if is_compound_generated_doc(doc):
+            missing_retrieval = [field for field in retrieval_required if not list_value(fm.get(field))]
+            if missing_retrieval:
+                warnings.append(
+                    f"{doc.rel}: h2-compound generated doc missing retrieval hook fields: {', '.join(missing_retrieval)}."
+                )
 
     print_report("kb-lint", hard, warnings)
     return 1 if hard and args.strict else 0
@@ -747,6 +964,8 @@ def command_cartridge_validate(args: argparse.Namespace) -> int:
         "harness cartridge-validate",
         "local-test-command",
         "harness-archive-dry-run",
+        "autorun-orchestrator",
+        "snapshot-restore",
         "archive-checklist",
         "ops-checklist",
         "codex-native-code-edit",
@@ -794,6 +1013,251 @@ def run_root(feature: str | None, run_id_value: str) -> Path:
     slug = safe_path_segment(feature, "feature") if feature else "_unscoped"
     run_segment = validate_run_id(run_id_value)
     return ROOT / ".harness-helm" / "runs" / slug / run_segment
+
+
+def validate_rewind_step(step: str) -> str:
+    if step not in REWINDABLE_STEPS:
+        raise ValueError(f"step must be one of: {', '.join(sorted(REWINDABLE_STEPS))}.")
+    return step
+
+
+def snapshot_root(feature: str, run_id_value: str, step: str) -> Path:
+    return run_root(feature, run_id_value) / "snapshots" / validate_rewind_step(step)
+
+
+def snapshot_manifest_path(feature: str, run_id_value: str, step: str) -> Path:
+    return snapshot_root(feature, run_id_value, step) / "manifest.json"
+
+
+def repository_rel(path: Path) -> str:
+    return path.relative_to(ROOT).as_posix()
+
+
+def snapshot_scope_paths(feature: str, run_id_value: str, step: str) -> list[Path]:
+    safe_feature = safe_path_segment(feature, "feature")
+    safe_run_id = validate_run_id(run_id_value)
+    templates = STEP_SNAPSHOT_SCOPE[validate_rewind_step(step)]
+    return [ROOT / template.format(feature=safe_feature, run_id=safe_run_id) for template in templates]
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def snapshot_file_path(root: Path, rel: str) -> Path:
+    return root / "files" / rel
+
+
+def archive_residue_paths(feature: str) -> list[str]:
+    archive_root = DOCS / "_archive"
+    if not archive_root.exists():
+        return []
+    matches: list[str] = []
+    for path in sorted(archive_root.rglob("*")):
+        if feature in path.name:
+            matches.append(repository_rel(path))
+    return matches
+
+
+def load_snapshot_manifest(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        raise FileNotFoundError("snapshot not found; rewind requires h2-autorun pre-step snapshots.")
+    raw = json.loads(read_text(path))
+    if not isinstance(raw, dict):
+        raise ValueError("snapshot manifest must be a JSON object.")
+    if raw.get("schema_version") != 1:
+        raise ValueError("snapshot manifest schema_version must be 1.")
+    return raw
+
+
+def command_snapshot_save(args: argparse.Namespace) -> int:
+    try:
+        root = snapshot_root(args.feature, args.run_id, args.step)
+        paths = snapshot_scope_paths(args.feature, args.run_id, args.step)
+    except ValueError as error:
+        print(f"h2-snapshot save: {error}")
+        return 1
+
+    files: list[dict[str, Any]] = []
+    for path in paths:
+        rel = repository_rel(path)
+        entry: dict[str, Any] = {
+            "path": rel,
+            "existed": path.exists(),
+            "snapshot_path": None,
+            "sha256": None,
+            "size": 0,
+        }
+        if path.exists():
+            target = snapshot_file_path(root, rel)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, target)
+            entry.update(
+                {
+                    "snapshot_path": repository_rel(target),
+                    "sha256": file_sha256(path),
+                    "size": path.stat().st_size,
+                }
+            )
+        files.append(entry)
+
+    manifest = {
+        "schema_version": 1,
+        "feature": args.feature,
+        "run_id": args.run_id,
+        "step": args.step,
+        "created_at": now_kst().isoformat(),
+        "kind": "pre-step-snapshot",
+        "files": files,
+        "archive_residue_policy": "preserve-and-warn",
+    }
+    write_text(root / "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+    print(f"h2-snapshot save: wrote {repository_rel(root / 'manifest.json')}")
+    return 0
+
+
+def command_snapshot_list(args: argparse.Namespace) -> int:
+    try:
+        feature = safe_path_segment(args.feature, "feature")
+        run_id_filter = validate_run_id(args.run_id) if args.run_id else None
+    except ValueError as error:
+        print(f"h2-snapshot list: {error}")
+        return 1
+    feature_root = ROOT / ".harness-helm" / "runs" / feature
+    if not feature_root.exists():
+        print(f"h2-snapshot list: no runs for feature {feature}")
+        return 0
+    manifests = sorted(feature_root.glob("*/snapshots/*/manifest.json"))
+    if run_id_filter:
+        manifests = [path for path in manifests if path.parts[-4] == run_id_filter]
+    if not manifests:
+        print("h2-snapshot list: no snapshots found.")
+        return 0
+    for manifest_path in manifests:
+        try:
+            manifest = load_snapshot_manifest(manifest_path)
+            print(f"{manifest.get('run_id')} {manifest.get('step')} {repository_rel(manifest_path)}")
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            print(f"{repository_rel(manifest_path)}: invalid manifest ({error})")
+    return 0
+
+
+def render_restore_report(
+    manifest: dict[str, Any],
+    actions: list[str],
+    warnings: list[str],
+    dry_run: bool,
+) -> str:
+    lines = [
+        "---",
+        "command: h2-rewind",
+        f"feature: {manifest.get('feature')}",
+        "status: skipped" if dry_run else "status: updated",
+        "next:",
+        f"  recommended_h2_step: {manifest.get('step')}",
+        "---",
+        "",
+        f"# h2-rewind Restore: {manifest.get('step')}",
+        "",
+        "## Actions",
+        "",
+    ]
+    lines.extend(f"- {action}" for action in actions)
+    if warnings:
+        lines.extend(["", "## Warnings", ""])
+        lines.extend(f"- {warning}" for warning in warnings)
+    lines.extend(["", "## Next", "", f"- recommended_h2_step: {manifest.get('step')}", ""])
+    return "\n".join(lines)
+
+
+def command_snapshot_restore(args: argparse.Namespace) -> int:
+    try:
+        manifest_path = snapshot_manifest_path(args.feature, args.run_id, args.step)
+        manifest = load_snapshot_manifest(manifest_path)
+        if manifest.get("feature") != args.feature or manifest.get("run_id") != args.run_id or manifest.get("step") != args.step:
+            raise ValueError("snapshot manifest does not match requested feature/run-id/step.")
+    except FileNotFoundError as error:
+        print(f"h2-snapshot restore: {error}")
+        return 2
+    except (ValueError, json.JSONDecodeError) as error:
+        print(f"h2-snapshot restore: {error}")
+        return 1
+
+    timestamp = now_kst().strftime("%Y%m%d-%H%M%S")
+    backup_root = run_root(args.feature, args.run_id) / "restore-backups" / timestamp / args.step
+    actions: list[str] = []
+    warnings: list[str] = []
+    for item in manifest.get("files", []):
+        if not isinstance(item, dict):
+            print("h2-snapshot restore: manifest files entries must be objects.")
+            return 1
+        rel = str(item.get("path", ""))
+        try:
+            active = resolve_under_root(rel, ROOT, "snapshot file path")
+        except ValueError as error:
+            print(f"h2-snapshot restore: {error}")
+            return 1
+        backup = backup_root / rel
+        existed = bool(item.get("existed"))
+        if active.exists():
+            actions.append(f"backup {rel} -> {repository_rel(backup)}")
+            if not args.dry_run:
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(active, backup)
+        if existed:
+            snapshot_rel = str(item.get("snapshot_path") or "")
+            try:
+                source = resolve_under_root(snapshot_rel, ROOT, "snapshot_path")
+            except ValueError as error:
+                print(f"h2-snapshot restore: {error}")
+                return 1
+            if not source.exists():
+                print(f"h2-snapshot restore: missing snapshot file {snapshot_rel}")
+                return 1
+            actions.append(f"restore {rel} from {snapshot_rel}")
+            if not args.dry_run:
+                active.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, active)
+        elif active.exists():
+            actions.append(f"remove active file absent at snapshot time: {rel}")
+            if not args.dry_run:
+                active.unlink()
+        else:
+            actions.append(f"leave absent: {rel}")
+
+    if args.step == "h2-archive":
+        residues = archive_residue_paths(args.feature)
+        if residues:
+            warnings.append("archive residue preserved: " + ", ".join(residues))
+
+    report = render_restore_report(manifest, actions, warnings, args.dry_run)
+    restore_path = snapshot_root(args.feature, args.run_id, args.step) / "restore.md"
+    if not args.dry_run:
+        write_text(restore_path, report)
+    print(report)
+    if not args.dry_run:
+        print(f"h2-snapshot restore: wrote {repository_rel(restore_path)}")
+    return 0
+
+
+def command_snapshot(args: argparse.Namespace) -> int:
+    if args.snapshot_action == "save":
+        return command_snapshot_save(args)
+    if args.snapshot_action == "list":
+        return command_snapshot_list(args)
+    if args.snapshot_action == "restore":
+        return command_snapshot_restore(args)
+    print("h2-snapshot: expected save, list, or restore.")
+    return 1
+
+
+def command_rewind(args: argparse.Namespace) -> int:
+    args.snapshot_action = "restore"
+    return command_snapshot_restore(args)
 
 
 def docs_matching_feature(feature: str | None, docs: list[Doc], schema: dict[str, Any]) -> list[Doc]:
@@ -861,21 +1325,92 @@ def docs_matching_task(tokens: list[str], docs: list[Doc], schema: dict[str, Any
     return [doc for _, doc in scored]
 
 
+def is_canonical_knowledge_doc(doc: Doc, schema: dict[str, Any]) -> bool:
+    if not doc.rel.startswith(CANONICAL_KNOWLEDGE_ROOTS):
+        return False
+    if doc.rel.startswith("docs/30_decisions/") and doc.path.name.endswith(".rejected.md"):
+        return False
+    return include_in_index(doc, schema)
+
+
+def canonical_docs(docs: list[Doc], schema: dict[str, Any]) -> list[Doc]:
+    return [doc for doc in docs if is_canonical_knowledge_doc(doc, schema)]
+
+
+def index_freshness(index_paths: list[Path], candidates: list[Doc]) -> tuple[str, str]:
+    missing = [path.relative_to(ROOT).as_posix() for path in index_paths if not path.exists()]
+    if missing:
+        return "absent", f"index freshness: missing {', '.join(missing)}; canonical docs direct scan fallback used."
+    if not candidates:
+        return "ok", "index freshness: indexes exist; no canonical docs were eligible for freshness comparison."
+
+    oldest_index = min(path.stat().st_mtime for path in index_paths)
+    newest_candidate = max(doc.path.stat().st_mtime for doc in candidates)
+    if newest_candidate > oldest_index:
+        return "stale", "index freshness: canonical docs are newer than docs/_indexes; run `.harness-helm/scripts/harness kb-index`."
+    return "ok", "index freshness: docs/_indexes are present and not older than canonical docs."
+
+
+def docs_matching_canonical_knowledge(
+    tokens: list[str],
+    feature: str | None,
+    docs: list[Doc],
+    schema: dict[str, Any],
+) -> list[Doc]:
+    candidates = canonical_docs(docs, schema)
+    if not candidates:
+        return []
+    scored: list[tuple[int, Doc]] = []
+    for doc in candidates:
+        score = 0
+        haystack = " ".join([
+            doc.rel.lower(),
+            doc.title.lower(),
+            " ".join(list_value(doc.frontmatter.get("tags"))).lower(),
+            " ".join(list_value(doc.frontmatter.get("module"))).lower(),
+            " ".join(list_value(doc.frontmatter.get("domain"))).lower(),
+            " ".join(list_value(doc.frontmatter.get("related"))).lower(),
+            " ".join(list_value(doc.frontmatter.get("source_trace"))).lower(),
+        ])
+        if feature and feature in haystack:
+            score += 3
+        for token in tokens:
+            if token in haystack:
+                score += 1
+        if "docs/40_knowledge/" in doc.rel and {"compound", "canonical", "knowledge", "h2-compound"} & set(tokens):
+            score += 2
+        if score > 0:
+            scored.append((score, doc))
+    scored.sort(key=lambda pair: (-pair[0], pair[1].rel))
+    return [doc for _, doc in scored[:CANONICAL_KNOWLEDGE_LIMIT]]
+
+
+def canonical_selected_by(doc: Doc, freshness_state: str) -> str:
+    tags = ["canonical-knowledge"]
+    if doc.rel.startswith("docs/40_knowledge/") or "canonical-promotion" in list_value(doc.frontmatter.get("tags")):
+        tags.append("compound-loop")
+    if freshness_state == "absent":
+        tags.append("index-absent")
+    elif freshness_state == "stale":
+        tags.append("index-stale")
+    return ", ".join(tags)
+
+
 RUNTIME_SEED_RULES: list[tuple[set[str], list[str]]] = [
     ({"workflow", "h2", "lifecycle", "command", "cartridge", "adapter", "audit", "harness"},
      ["README.md", ".harness-helm/h2-cartridge.yml", ".harness-helm/h2-schema.yml",
       ".claude/skills/harness-helm/SKILL.md", ".codex/skills/harness-helm/SKILL.md",
-      "docs/40_knowledge/conventions/h2-product-memory.md"]),
+      "docs/10_domain/harness-helm/concepts.md"]),
     ({"upstream", "gstack", "superpowers", "compound", "ce", "provider", "surface"},
      [".harness-helm/h2-cartridge.yml",
-      ".claude/skills/harness-helm/references/upstream-tool-invocation.md",
-      ".claude/skills/harness-helm/references/upstream-surface-map.md"]),
+      ".claude/skills/harness-helm/references/cartridge-command-mapping.md",
+      ".claude/skills/harness-helm/references/cartridge-surface-map.md"]),
     ({"normalization", "raw", "fixture", "evidence"},
-     [".claude/skills/harness-helm/references/upstream-output-normalization.md",
+     [".claude/skills/harness-helm/references/cartridge-output-normalization.md",
       ".harness-helm/h2-cartridge.yml"]),
     ({"reference", "snapshot", "parity", "drift"},
      [".claude/skills/harness-helm/references/runtime-parity.md",
-      "docs/40_knowledge/conventions/guidelines/h2-runtime-reference-selection.md"]),
+      "docs/40_knowledge/conventions/guidelines/harness-helm/runtime-reference-selection.md"]),
     ({"runbook", "incident", "release", "ops", "deploy"},
      ["docs/50_operations/README.md",
       ".harness-helm/h2-cartridge.yml"]),
@@ -914,6 +1449,12 @@ def command_context(args: argparse.Namespace) -> int:
     feature_doc_rels = {doc.rel for doc in feature_docs}
     task_docs = docs_matching_task(tokens, docs, schema, feature_doc_rels)
     index_docs = [DOCS / "_indexes" / name for name in ("KB_INDEX.md", "DOMAIN_INDEX.md", "TAG_INDEX.md")]
+    canonical_candidates = canonical_docs(docs, schema)
+    freshness_state, freshness_line = index_freshness(index_docs, canonical_candidates)
+    canonical_entries = [
+        (doc.rel, canonical_selected_by(doc, freshness_state))
+        for doc in docs_matching_canonical_knowledge(tokens, args.feature, docs, schema)
+    ]
 
     # primary: indexes + feature-match + top task-token + runtime seed
     primary_entries: list[tuple[str, str]] = []
@@ -972,6 +1513,11 @@ def command_context(args: argparse.Namespace) -> int:
         lines.extend(f"- {rel} (selected_by: {tag})" for rel, tag in supporting_entries)
     else:
         lines.append("- <none>")
+    lines.extend(["", "### canonical_knowledge"])
+    if canonical_entries:
+        lines.extend(f"- {rel} (selected_by: {tag})" for rel, tag in canonical_entries)
+    else:
+        lines.append("- <none>")
     lines.extend(["", "### excluded_by_policy"])
     lines.extend(f"- {item}" for item in excluded)
     lines.extend(
@@ -979,8 +1525,8 @@ def command_context(args: argparse.Namespace) -> int:
             "",
             "### assumptions",
             "- `_indexes` are routing hints; original docs remain the canonical reference.",
-            "- If indexes are stale or absent, canonical docs are inspected directly.",
-            "- `selected_by` tags primary/supporting docs by source: index | feature-match | task-token | runtime-seed.",
+            "- If indexes are stale or absent, canonical docs are inspected directly and marked with `index-absent` or `index-stale`.",
+            "- `selected_by` tags docs by source: index | feature-match | task-token | runtime-seed | canonical-knowledge | compound-loop | index-absent | index-stale.",
             "",
             "## Artifacts",
             "",
@@ -1006,9 +1552,12 @@ def command_context(args: argparse.Namespace) -> int:
             "",
             "### completed",
             "- context pack generated",
+            "- canonical knowledge direct scan completed",
+            *([f"- {freshness_line}"] if freshness_state == "ok" else []),
             "",
             "### not_verified",
             "- human review of context relevance",
+            *([f"- {freshness_line}"] if freshness_state != "ok" else []),
             "",
             "## Next",
             "",
@@ -1074,6 +1623,12 @@ def command_reference_validate(args: argparse.Namespace) -> int:
     for runtime, reference_root in runtime_roots.items():
         required = dict(REFERENCE_MANIFEST["shared"])
         required.update(REFERENCE_MANIFEST[runtime])
+        for legacy_path in sorted(reference_root.glob("upstream-*")):
+            hard.append(f"{legacy_path.relative_to(ROOT).as_posix()}: legacy upstream-* reference filename is not allowed.")
+        for legacy_name in ("external-tool-registry.md", "external-tool-registry.ko.md"):
+            legacy_path = reference_root / legacy_name
+            if legacy_path.exists():
+                hard.append(f"{legacy_path.relative_to(ROOT).as_posix()}: legacy external-tool-registry filename is not allowed.")
         for base_path in sorted(reference_root.glob("*.md")):
             if base_path.name.endswith(".ko.md"):
                 original_path = base_path.with_name(base_path.name.removesuffix(".ko.md") + ".md")
@@ -1108,6 +1663,19 @@ def command_reference_validate(args: argparse.Namespace) -> int:
             for marker in markers:
                 if marker not in text:
                     hard.append(f"{rel}: missing marker {marker!r}.")
+            if filename == "cartridge-command-mapping.md" and MISLEADING_VALUE_SNAPSHOT_CLAIM in text:
+                hard.append(
+                    f"{rel}: must not present itself as a provider/surface value snapshot; "
+                    ".harness-helm/h2-cartridge.yml is the single value source."
+                )
+            if filename in GUIDELINE_DERIVED_REFERENCE_HEADERS:
+                guideline = GUIDELINE_DERIVED_REFERENCE_HEADERS[filename]
+                expected_snapshot_header = f"Compact runtime snapshot of `{guideline}`."
+                expected_mapping_header = f"Mapping authority: `{REFERENCE_MAPPING_AUTHORITY}`."
+                if expected_snapshot_header not in text:
+                    hard.append(f"{rel}: missing guideline-derived snapshot header {expected_snapshot_header!r}.")
+                if expected_mapping_header not in text:
+                    hard.append(f"{rel}: missing mapping authority header {expected_mapping_header!r}.")
 
             if filename == "workflow-lifecycle-commands.md":
                 runtime_name = runtime_names[runtime]
@@ -1170,6 +1738,16 @@ def command_reference_validate(args: argparse.Namespace) -> int:
                     warnings.append(
                         f"{ko_path.relative_to(ROOT).as_posix()}: base marker {marker!r}이 한국어 번역에서 보존되지 않음 (식별자성 marker는 그대로 유지 권장)."
                     )
+            if filename in GUIDELINE_DERIVED_REFERENCE_HEADERS:
+                guideline = GUIDELINE_DERIVED_REFERENCE_HEADERS[filename]
+                if guideline not in ko_text:
+                    hard.append(
+                        f"{ko_path.relative_to(ROOT).as_posix()}: missing canonical guideline path {guideline!r}."
+                    )
+                if REFERENCE_MAPPING_AUTHORITY not in ko_text:
+                    hard.append(
+                        f"{ko_path.relative_to(ROOT).as_posix()}: missing mapping authority path {REFERENCE_MAPPING_AUTHORITY!r}."
+                    )
 
     print_report("reference-validate", hard, warnings)
     return 1 if hard and args.strict else 0
@@ -1180,6 +1758,7 @@ TARGET_SMOKE_REQUIRED_PATHS = [
     "AGENTS.md",
     "CLAUDE.md",
     ".harness-helm/h2-cartridge.yml",
+    ".harness-helm/h2-compound.yml",
     ".harness-helm/h2-schema.yml",
     ".harness-helm/scripts/harness.py",
     ".claude/commands/h2",
@@ -1187,6 +1766,7 @@ TARGET_SMOKE_REQUIRED_PATHS = [
     ".codex/skills/h2",
     ".codex/skills/harness-helm/SKILL.md",
     "docs",
+    "docs/40_knowledge/conventions/guidelines/harness-helm",
 ]
 TARGET_SMOKE_EXCLUDED_PATHS = ["cookbooks"]
 
@@ -1230,6 +1810,22 @@ def command_target_smoke(args: argparse.Namespace) -> int:
         for rel in TARGET_SMOKE_REQUIRED_PATHS:
             if not (target / rel).exists():
                 hard.append(f"target-smoke: required surface missing in target project: {rel}.")
+
+        for rel in sorted((target / "docs" / "40_knowledge" / "conventions" / "guidelines").glob("h2-*.md")):
+            hard.append(
+                "target-smoke: legacy flat guideline filename remains in target project: "
+                f"{rel.relative_to(target).as_posix()}."
+            )
+        for root in [
+            target / ".claude" / "skills" / "harness-helm" / "references",
+            target / ".codex" / "skills" / "harness-helm" / "references",
+        ]:
+            if root.exists():
+                for rel in sorted(root.glob("upstream-*")):
+                    hard.append(
+                        "target-smoke: legacy upstream-* reference filename remains in target project: "
+                        f"{rel.relative_to(target).as_posix()}."
+                    )
 
         # 임시 디렉터리에서 4종 validator subprocess 실행
         script = target / ".harness-helm" / "scripts" / "harness.py"
@@ -1460,13 +2056,20 @@ def archive_destination(dest_root: Path, phase: str, src: Path) -> Path:
     return dest_root / f"{src.stem}.{suffix}{src.suffix}"
 
 
-def cleanup_archived_run(feature: str, dry_run: bool) -> None:
+def cleanup_archived_run(feature: str, dry_run: bool, dest_root: Path | None = None) -> None:
     run_path = ROOT / ".harness-helm" / "runs" / feature
     if not run_path.exists():
         return
-    print(f"  {'would remove' if dry_run else 'remove'} {run_path.relative_to(ROOT)}")
-    if not dry_run:
-        shutil.rmtree(run_path)
+    if dest_root is not None:
+        runs_dest = dest_root / "runs"
+        print(f"  {'would move' if dry_run else 'move'} {run_path.relative_to(ROOT)} -> {runs_dest.relative_to(ROOT)}")
+        if not dry_run:
+            runs_dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(run_path), str(runs_dest))
+    else:
+        print(f"  {'would remove' if dry_run else 'remove'} {run_path.relative_to(ROOT)}")
+        if not dry_run:
+            shutil.rmtree(run_path)
 
 
 INSTALL_MANIFEST_SCHEMA_VERSION = 1
@@ -1881,7 +2484,7 @@ def command_archive(args: argparse.Namespace) -> int:
     manifest_path = dest_root / "manifest.md"
     if args.dry_run:
         print(f"  would write manifest {manifest_path.relative_to(ROOT)}")
-        cleanup_archived_run(feature, dry_run=True)
+        cleanup_archived_run(feature, dry_run=True, dest_root=dest_root)
     if not args.dry_run:
         lines = ["---"]
         for key, value in manifest.items():
@@ -1895,7 +2498,7 @@ def command_archive(args: argparse.Namespace) -> int:
                 lines.append(f"{key}: {value}")
         lines.extend(["---", "", f"# Archive Manifest: {feature}", "", "Archive manifest metadata only. Do not include detailed implementation content here.", ""])
         write_text(manifest_path, "\n".join(lines))
-        cleanup_archived_run(feature, dry_run=False)
+        cleanup_archived_run(feature, dry_run=False, dest_root=dest_root)
     return 0
 
 
@@ -1912,7 +2515,7 @@ def command_cleanup_runs(args: argparse.Namespace) -> int:
         age = (current - dt.datetime.fromtimestamp(path.stat().st_mtime, tz=current.tzinfo)).days
         if path.name == "raw" and age >= args.raw_days:
             candidates.append(path)
-        if path.name in {"normalized", "promotion-candidates"} and age >= args.normalized_days:
+        if path.name in {"normalized", "promotion-candidates", "snapshots", "restore-backups"} and age >= args.normalized_days:
             candidates.append(path)
     if not candidates:
         print("harness cleanup-runs: no cleanup candidates.")
@@ -1970,6 +2573,33 @@ def build_parser() -> argparse.ArgumentParser:
     context.add_argument("--next")
     context.add_argument("--dry-run", action="store_true")
     context.set_defaults(func=command_context)
+
+    snapshot = sub.add_parser("h2-snapshot")
+    snapshot_sub = snapshot.add_subparsers(dest="snapshot_action", required=True)
+    snapshot_save = snapshot_sub.add_parser("save")
+    snapshot_save.add_argument("--feature", required=True)
+    snapshot_save.add_argument("--run-id", required=True)
+    snapshot_save.add_argument("--step", required=True, choices=sorted(REWINDABLE_STEPS))
+    snapshot_save.set_defaults(func=command_snapshot)
+    snapshot_list = snapshot_sub.add_parser("list")
+    snapshot_list.add_argument("--feature", required=True)
+    snapshot_list.add_argument("--run-id")
+    snapshot_list.set_defaults(func=command_snapshot)
+    snapshot_restore = snapshot_sub.add_parser("restore")
+    snapshot_restore.add_argument("--feature", required=True)
+    snapshot_restore.add_argument("--run-id", required=True)
+    snapshot_restore.add_argument("--step", required=True, choices=sorted(REWINDABLE_STEPS))
+    snapshot_restore.add_argument("--dry-run", action="store_true")
+    snapshot_restore.add_argument("--force", action="store_true")
+    snapshot_restore.set_defaults(func=command_snapshot)
+
+    rewind = sub.add_parser("h2-rewind")
+    rewind.add_argument("step", choices=sorted(REWINDABLE_STEPS))
+    rewind.add_argument("--feature", required=True)
+    rewind.add_argument("--run-id", required=True)
+    rewind.add_argument("--dry-run", action="store_true")
+    rewind.add_argument("--force", action="store_true")
+    rewind.set_defaults(func=command_rewind)
 
     templates = sub.add_parser("template-validate")
     templates.add_argument("--strict", action="store_true", help="Exit non-zero when hard errors exist.")

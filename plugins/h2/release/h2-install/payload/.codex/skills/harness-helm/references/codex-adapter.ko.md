@@ -1,6 +1,6 @@
-# 0402 Codex Adapter Reference
+# Codex Adapter Reference
 
-Codex adapter를 위한 compact runtime snapshot입니다.
+`0402 Codex Adapter`의 압축 runtime snapshot입니다.
 
 ## 규칙
 
@@ -12,7 +12,7 @@ Core workflow와 Claude Code adapter와 같은 h2 command semantics, output cont
 
 Codex는 다음을 지원해야 합니다.
 
-`h2-context`, `h2-plan`, `h2-design`, `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, `h2-archive`, `h2-ops`, `h2-cartridge`.
+`h2-context`, `h2-plan`, `h2-design`, `h2-autorun`, `h2-rewind`, `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, `h2-archive`, `h2-ops`, `h2-cartridge`.
 
 ## 책임
 

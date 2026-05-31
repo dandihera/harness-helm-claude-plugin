@@ -8,7 +8,7 @@ next:
 
 <!-- harness-helm h2-cartridge staging output. .harness-helm/h2-cartridge.yml의 effective mapping을 검증하고
      mismatch/누락을 기록한다. provider/surface/routing 본문은 yml의 source of truth를 가리킨다.
-     See 0601 Upstream Tool Invocation. -->
+     See 0601 Cartridge Command Mapping. -->
 
 # h2-cartridge — Effective Mapping Validation
 

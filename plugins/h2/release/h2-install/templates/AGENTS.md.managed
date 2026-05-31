@@ -2,7 +2,7 @@
 
 ## harness-helm
 
-- `h2` is the short alias for `harness-helm`. The canonical definition lives in `docs/40_knowledge/conventions/h2-product-memory.md` under `## h2`.
+- `h2` is the short alias for `harness-helm`. The canonical definition lives in `docs/10_domain/harness-helm/concepts.md` under `## h2`.
 - Route `h2-*` workflows through `.harness-helm/h2-cartridge.yml`.
 - Use the `h2-*` commands (plan, design, analysis, build, test, review, report, compound, archive, ops, context, cartridge) for AI-native engineering workflow.
 - Workflow artifacts live under `docs/01_plan`, `docs/02_design`, `docs/03_review`, `docs/04_report`.

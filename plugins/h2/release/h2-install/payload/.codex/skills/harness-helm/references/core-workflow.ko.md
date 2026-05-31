@@ -1,6 +1,6 @@
-# 0301 Core Workflow Spec Reference
+# Core Workflow Spec Reference
 
-harness-helm core workflow의 압축 runtime snapshot입니다.
+`0301 Core Workflow Spec`의 압축 runtime snapshot입니다.
 
 ## 목적
 
@@ -11,7 +11,9 @@ harness-helm core workflow의 압축 runtime snapshot입니다.
 - `h2-context`: primary, supporting, excluded docs를 선택하고 run context pack을 생성 또는 갱신합니다.
 - `h2-plan`: goal, scope, non-goals, done criteria, risk, verification을 담아 `docs/01_plan/{feature}.md`를 생성 또는 갱신합니다.
 - `h2-design`: plan을 기준으로 implementation design을 `docs/02_design/{feature}.md`에 작성합니다.
-- `h2-analysis`: plan과 design을 비교하고 gap과 alignment work를 기록합니다.
+- `h2-analysis`: plan과 design을 비교하고 gap과 alignment work를 `docs/02_design/{feature}.analysis.md`에 기록합니다.
+- `h2-autorun`: design 이후 `h2-analysis`부터 `h2-archive`까지 orchestration하고 단계별 status를 `.harness-helm/runs/{feature}/{run-id}/autorun-summary.md`에 요약합니다.
+- `h2-rewind`: 특정 `h2-autorun` pre-step snapshot을 복원하고 evidence를 `.harness-helm/runs/{feature}/{run-id}/snapshots/{step}/restore.md`에 기록합니다.
 - `h2-build`: 구현 작업, 변경 파일, risk, blocked item을 기록합니다.
 - `h2-test`: test command, result, skipped check, failure, remaining verification을 기록합니다.
 - `h2-review`: code, QA, security, cross-review findings를 `docs/03_review/{type}/{feature}.md`에 기록합니다.
@@ -32,6 +34,7 @@ status: draft | updated | skipped | blocked
 context_pack:
   primary_docs: []
   supporting_docs: []
+  canonical_knowledge: []
   excluded_by_policy: []
   assumptions: []
 artifacts:

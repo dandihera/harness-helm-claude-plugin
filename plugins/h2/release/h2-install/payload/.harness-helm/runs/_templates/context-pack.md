@@ -3,7 +3,7 @@ command: h2-context
 feature: "<TODO: feature-slug or null>"
 status: draft
 next:
-  recommended_h2_step: "<TODO: h2-plan | h2-design | h2-analysis | h2-report | null>"
+  recommended_h2_step: "<TODO: h2-plan | h2-design | h2-autorun | h2-analysis | h2-report | null>"
 ---
 
 <!-- harness-helm h2-context staging output. .harness-helm/runs is volatile staging, not canonical KB.
@@ -19,8 +19,11 @@ next:
 ### supporting_docs
 - <TODO: 부수적 근거 문서>
 
+### canonical_knowledge
+- <TODO: 이번 run에 재투입되는 canonical knowledge 문서. 없으면 <none>>
+
 ### excluded_by_policy
-- <TODO: 0103 Retrieval Policy로 제외한 문서 (예: _archive 본문, draft, regulated)>
+- <TODO: 0103 Retrieval and Index Policy로 제외한 문서 (예: _archive 본문, draft, regulated)>
 
 ### assumptions
 - <TODO: 명시적으로 가정한 사실>
@@ -49,10 +52,12 @@ next:
 
 ### completed
 - <TODO: 이미 수행된 검증>
+- <TODO: index freshness 확인 또는 canonical docs direct scan 결과>
 
 ### not_verified
 - <TODO: 사람 검토가 필요한 미검증 항목>
+- <TODO: index absent/stale warning이 있으면 기록>
 
 ## Next
 
-- recommended_h2_step: <TODO: h2-plan | h2-design | h2-analysis | h2-report | null>
+- recommended_h2_step: <TODO: h2-plan | h2-design | h2-autorun | h2-analysis | h2-report | null>

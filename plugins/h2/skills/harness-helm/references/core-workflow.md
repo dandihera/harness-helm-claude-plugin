@@ -1,6 +1,6 @@
-# 0301 Core Workflow Spec Reference
+# Core Workflow Spec Reference
 
-Compact runtime snapshot of the harness-helm core workflow.
+Compact runtime snapshot of `0301 Core Workflow Spec`.
 
 ## Purpose
 
@@ -11,7 +11,9 @@ Compact runtime snapshot of the harness-helm core workflow.
 - `h2-context`: select primary, supporting, and excluded docs; create or update a run context pack.
 - `h2-plan`: create or update `docs/01_plan/{feature}.md` with goal, scope, non-goals, done criteria, risk, and verification.
 - `h2-design`: create or update `docs/02_design/{feature}.md` with implementation design based on the plan.
-- `h2-analysis`: compare plan and design, record gaps, and recommend alignment work.
+- `h2-analysis`: compare plan and design, record gaps, and recommend alignment work in `docs/02_design/{feature}.analysis.md`.
+- `h2-autorun`: after design, orchestrate `h2-analysis` through `h2-archive` and summarize step status in `.harness-helm/runs/{feature}/{run-id}/autorun-summary.md`.
+- `h2-rewind`: restore a specific `h2-autorun` pre-step snapshot and record evidence in `.harness-helm/runs/{feature}/{run-id}/snapshots/{step}/restore.md`.
 - `h2-build`: record implementation work, changed files, risks, and blocked items.
 - `h2-test`: record test commands, results, skipped checks, failures, and remaining verification.
 - `h2-review`: record code, QA, security, or cross-review findings in `docs/03_review/{type}/{feature}.md`.
@@ -32,6 +34,7 @@ status: draft | updated | skipped | blocked
 context_pack:
   primary_docs: []
   supporting_docs: []
+  canonical_knowledge: []
   excluded_by_policy: []
   assumptions: []
 artifacts:

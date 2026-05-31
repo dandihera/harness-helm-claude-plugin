@@ -8,16 +8,21 @@
 #   - copy_dir source는 '/'로 끝나야 한다.
 #   - 중복 destination과 '..' segment는 거부된다.
 #   - docs/_archive/는 `.gitkeep`만 포함한 clean scaffold로 seed하고 source history는 제외한다.
-#   - docs/_indexes/는 INDEX_GUIDE와 clean generated index 파일만 seed한다.
+#   - docs/_indexes/는 clean generated index 파일만 seed한다.
 #     target project는 `harness kb-index`로 index 내용을 재생성한다.
 #   - docs/01_plan ~ docs/04_report는 README.md만 seed한다.
 #     workflow artifact는 target project가 생성한다.
-#   - docs/10_domain ~ docs/50_operations는 하위 tree 전체를 seed한다.
+#   - docs/10_domain ~ docs/50_operations는 source-only 제외 규칙을 거쳐 하위 tree를 seed한다.
+#   - harness-helm runtime guideline은 docs/40_knowledge/conventions/guidelines/harness-helm/ 아래에 둔다.
+#     기존 flat h2-*.md guideline은 canonical target path가 아니다.
+#   - docs/40_knowledge/learnings/는 README.md scaffold만 target payload에 남긴다.
+#     source repository learning 본문은 target project에 적용하지 않는다.
 #   - docs/50_operations/releases/*.release-notes.md는 payload에서 제외한다.
 #     source repository release notes는 target project에 적용하지 않는다.
 
 # .harness-helm runtime 기반
 copy      payload/.harness-helm/h2-cartridge.yml                   .harness-helm/h2-cartridge.yml
+copy      payload/.harness-helm/h2-compound.yml                    .harness-helm/h2-compound.yml
 copy      payload/.harness-helm/h2-schema.yml                      .harness-helm/h2-schema.yml
 copy      payload/.harness-helm/scripts/harness.py                 .harness-helm/scripts/harness.py
 copy      payload/.harness-helm/scripts/harness                    .harness-helm/scripts/harness
@@ -39,7 +44,6 @@ copy_dir  payload/.codex/skills/harness-helm/references/           .codex/skills
 # docs template (`harness new-doc`에서 사용)
 copy_dir  payload/docs/_templates/                                 docs/_templates/
 copy      payload/docs/_archive/.gitkeep                           docs/_archive/.gitkeep
-copy      payload/docs/_indexes/INDEX_GUIDE.md                     docs/_indexes/INDEX_GUIDE.md
 copy      payload/docs/_indexes/KB_INDEX.md                        docs/_indexes/KB_INDEX.md
 copy      payload/docs/_indexes/DOMAIN_INDEX.md                    docs/_indexes/DOMAIN_INDEX.md
 copy      payload/docs/_indexes/TAG_INDEX.md                       docs/_indexes/TAG_INDEX.md

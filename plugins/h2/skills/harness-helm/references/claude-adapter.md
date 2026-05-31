@@ -1,6 +1,6 @@
-# 0401 Claude Code Adapter Reference
+# Claude Code Adapter Reference
 
-Compact runtime snapshot for the Claude Code adapter.
+Compact runtime snapshot of `0401 Claude Code Adapter`.
 
 ## Rule
 
@@ -12,7 +12,7 @@ It must preserve the same h2 command semantics, output contract, routing, stagin
 
 Claude Code should support:
 
-`h2-context`, `h2-plan`, `h2-design`, `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, `h2-archive`, `h2-ops`, and `h2-cartridge`.
+`h2-context`, `h2-plan`, `h2-design`, `h2-autorun`, `h2-rewind`, `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, `h2-archive`, `h2-ops`, and `h2-cartridge`.
 
 ## Responsibilities
 

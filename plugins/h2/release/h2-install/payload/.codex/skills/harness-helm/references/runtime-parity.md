@@ -18,7 +18,7 @@ Claude Code and Codex expose different command surfaces, but both must preserve 
 - Common input meaning: `command`, `feature`, `task`, optional `source_request`, `references`, and `constraints`.
 - Common output meaning: `context_pack`, `artifacts`, `routing`, `verification`, and `next`.
 - Routing must match `.harness-helm/h2-cartridge.yml` when installed.
-- If `.harness-helm/h2-cartridge.yml` is absent, use `references/upstream-tool-invocation.md` as the compact runtime mapping.
+- If `.harness-helm/h2-cartridge.yml` is absent, use `references/cartridge-command-mapping.md` as the compact runtime mapping.
 - Fallback-only checks must not be recorded as actual upstream invocations.
 
 ## Upstream Invocation Parity

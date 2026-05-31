@@ -4,14 +4,16 @@ Source cookbook: `cookbooks/0300-workflow-contract/0303-workflow-lifecycle-comma
 
 This is a compact runtime snapshot for Claude Code and Codex h2 command meanings.
 
-This file defines command meaning and routing. It does not choose upstream providers, implement agent tools, run tests, or promote canonical docs. Provider/surface/fallback mapping belongs to `.harness-helm/h2-cartridge.yml` and `references/upstream-tool-invocation.md`.
+This file defines command meaning and routing. It does not choose upstream providers, implement agent tools, run tests, or promote canonical docs. Provider/surface/fallback mapping belongs to `.harness-helm/h2-cartridge.yml` and `references/cartridge-command-mapping.md`.
 
 ## Commands
 
 - `h2-context`: create or update run context.
 - `h2-plan`: plan work and route to `docs/01_plan/{feature}.md`.
 - `h2-design`: create implementation design and route to `docs/02_design/{feature}.md`.
-- `h2-analysis`: inspect plan/design gaps and record alignment notes.
+- `h2-analysis`: inspect plan/design gaps and route alignment notes to `docs/02_design/{feature}.analysis.md`.
+- `h2-autorun`: after design, run `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, and `h2-archive` in order, stopping on `status: blocked`.
+- `h2-rewind`: restore a specific `h2-autorun` pre-step snapshot; if the snapshot is missing, block with `blocked:no-snapshot`.
 - `h2-build`: record implementation work and changed files.
 - `h2-test`: record test execution, skipped checks, and remaining verification.
 - `h2-review`: record review findings and route to `docs/03_review/{type}/{feature}.md`.

@@ -20,7 +20,7 @@ related: []
        NNNN-{topic}.pending.md  -> status: pending
        NNNN-{topic}.accepted.md -> status: accepted
        NNNN-{topic}.rejected.md -> status: rejected   (ai_avoid_phrases 필수)
-     See 0102 Frontmatter Schema, 0103 Retrieval Policy. -->
+     See 0102 Frontmatter Schema, 0103 Retrieval and Index Policy. -->
 
 # ADR-NNNN: <TODO: 결정 제목>
 

@@ -1,6 +1,6 @@
 ---
 name: harness-helm
-description: harness-helm h2 워크플로를 위한 Claude Code 어댑터. h2-context, h2-plan, h2-design, h2-analysis, h2-build, h2-test, h2-review, h2-report, h2-compound, h2-archive, h2-ops, h2-cartridge에 사용하며, 0301-core-workflow-spec의 command semantics, output fields, staging rules, docs routing을 보존한다.
+description: harness-helm h2 워크플로를 위한 Claude Code 어댑터. h2-context, h2-plan, h2-design, h2-autorun, h2-rewind, h2-analysis, h2-build, h2-test, h2-review, h2-report, h2-compound, h2-archive, h2-ops, h2-cartridge에 사용하며, 0301-core-workflow-spec의 command semantics, output fields, staging rules, docs routing을 보존한다.
 ---
 
 # harness-helm
@@ -15,16 +15,20 @@ Bundled runtime references:
 - `references/claude-entrypoint.md`: `0403 Runtime Parity Test`를 위한 Claude smoke/parity 예시.
 - `references/runtime-parity.md`: Claude Code와 Codex의 `0403 Runtime Parity Test` parity 결과.
 - `references/workflow-lifecycle-commands.md`: `0303 Workflow Lifecycle Commands`의 `h2-*` command semantics.
-- `references/upstream-tool-invocation.md`: `0601 Upstream Tool Invocation`의 upstream provider/surface/fallback mapping.
-- `references/external-tool-registry.md`: `0602 Upstream Tool Registry`의 integration 대상, 대안, availability, registration rules.
-- `references/upstream-surface-map.md`: `0603 Upstream Surface Map`의 upstream surface 추천과 drift note.
-- `references/upstream-output-normalization.md`: `0604 Upstream Output Normalization`의 upstream raw output → h2 template 정규화 규칙.
+- `references/context-pack-contract.md`: `0305 Context Pack Contract`의 retrieval snapshot 규칙.
+- `references/runtime-folder-structure.md`: `0503 h2 Runtime Folder Structure`의 설치 runtime과 run staging layout.
+- `references/compound-policy-config.md`: `0306 Compound Policy Config`의 h2-compound write/review gate 정책.
+- `references/h2-rewind-recovery.md`: h2-autorun snapshot과 h2-rewind restore boundary 규칙.
+- `references/cartridge-command-mapping.md`: `0601 Cartridge Command Mapping`의 invocation recording, fallback handling, routing invariant.
+- `references/cartridge-tool-registry.md`: `0602 External Tool Registry`의 integration 대상, 대안, availability, registration rules.
+- `references/cartridge-surface-map.md`: `0603 Cartridge Surface Map`의 upstream surface 추천과 drift note.
+- `references/cartridge-output-normalization.md`: `0604 Cartridge Output Normalization`의 upstream raw output → h2 template 정규화 규칙.
 - `references/canonical-promotion-flow.md`: `h2-compound` 승인 게이트와 canonical 작성 규칙의 runtime snapshot.
 - `references/specs-vs-decisions.md`: `20_specs`와 `30_decisions` 사이 목적지 판단의 runtime snapshot.
-- `references/upstream-selection-and-override.md`: run-level upstream override와 permanent mapping 변경의 runtime snapshot.
-- `docs/40_knowledge/conventions/guidelines/h2-runtime-reference-selection.md`: snapshot scope를 정하는 meta guideline. bundled runtime snapshot으로 복제하지 않는다.
+- `references/provider-surface-selection-and-override.md`: run-level upstream override와 permanent mapping 변경의 runtime snapshot.
+- `docs/40_knowledge/conventions/guidelines/harness-helm/runtime-reference-selection.md`: snapshot scope를 정하는 meta guideline. bundled runtime snapshot으로 복제하지 않는다.
 
-문서가 설치되면 canonical runtime convention은 `docs/40_knowledge/conventions/guidelines/*.md` 아래에 보관한다. 해당 문서가 없거나 로딩 비용이 큰 경우 bundled `references/canonical-promotion-flow.md`, `references/specs-vs-decisions.md`, `references/upstream-selection-and-override.md`가 compact runtime snapshot을 제공한다.
+문서가 설치되면 canonical runtime convention은 `docs/40_knowledge/conventions/guidelines/*.md` 아래에 보관한다. 해당 문서가 없거나 로딩 비용이 큰 경우 bundled `references/canonical-promotion-flow.md`, `references/specs-vs-decisions.md`, `references/provider-surface-selection-and-override.md`가 compact runtime snapshot을 제공한다.
 
 base `references/*.md` 파일은 Claude/Codex parity와 compact loading을 위해 영문으로 작성한다. 같은 이름의 `references/*.ko.md`는 stakeholder 검토용 한국어 번역이며 default agent context에는 자동으로 로드하지 않는다. 사용자가 명시적으로 한국어 검토를 요청할 때만 읽는다.
 
@@ -46,13 +50,15 @@ Technical identifier, command name, file path, frontmatter key, proper noun, sou
 2. canonical `h2-*` command semantics, output fields, staging rules, docs routing은 이 `SKILL.md`를 기준으로 한다.
 3. `.claude/commands/h2/*.md`는 얇은 slash command alias로만 취급한다.
 4. 자세한 criteria, parity evidence, upstream mapping, normalization, promotion rule이 필요할 때만 bundled `references/*.md`를 로드한다.
-5. 설치되어 있으면 `.harness-helm/h2-cartridge.yml`을 editable provider, surface, fallback, routing 값의 기준으로 사용한다. 없으면 `references/upstream-tool-invocation.md`를 사용한다.
+5. 설치되어 있으면 `.harness-helm/h2-cartridge.yml`을 editable provider, surface, fallback, routing 값의 기준으로 사용한다. 없으면 `references/cartridge-command-mapping.md`는 invocation recording, fallback handling, routing invariant 확인에만 사용한다.
+6. 설치되어 있으면 `.harness-helm/h2-compound.yml`을 h2-compound domain refinement, canonical destination, review gate, retrieval hook policy의 기준으로 사용한다. 없으면 built-in conservative default를 사용한다.
 
 ## Runtime Source Hierarchy
 
 - Source repository의 design record는 `cookbooks/`에 있지만, installed target project에는 `cookbooks/`가 없다.
 - Installed runtime command semantics는 이 `SKILL.md`, `references/core-workflow.md`, `references/workflow-lifecycle-commands.md`를 기준으로 한다.
-- Runtime provider/surface mapping은 설치된 `.harness-helm/h2-cartridge.yml`을 기준으로 하며, bundled upstream reference는 fallback이다.
+- Runtime provider/surface mapping은 설치된 `.harness-helm/h2-cartridge.yml`을 기준으로 한다. Bundled upstream reference는 cartridge 값 사본이 아니라 invocation recording, fallback handling, routing invariant fallback guidance다.
+- Runtime h2-compound knowledge policy는 설치된 `.harness-helm/h2-compound.yml`을 기준으로 하며, 없으면 built-in conservative default를 fallback으로 사용한다.
 - Runtime schema validation은 `.harness-helm/h2-schema.yml`을 기준으로 한다.
 - Root `CLAUDE.md`와 `AGENTS.md`는 project-wide entrypoint guidance를 제공하며 full workflow contract를 중복 정의하지 않는다.
 
@@ -69,6 +75,8 @@ Claude Code는 다음 `h2-*` command를 제공해야 한다:
 - `h2-context`
 - `h2-plan`
 - `h2-design`
+- `h2-autorun`
+- `h2-rewind`
 - `h2-analysis`
 - `h2-build`
 - `h2-test`
@@ -79,14 +87,14 @@ Claude Code는 다음 `h2-*` command를 제공해야 한다:
 - `h2-ops`
 - `h2-cartridge`
 
-`.harness-helm/h2-cartridge.yml`이 설치되어 있으면 provider, surface, fallback label, routing target 값과 external tool registry entry의 공통 기준으로 사용한다. target project에 이 파일이 없으면 bundled `references/upstream-tool-invocation.md`를 runtime mapping으로 사용한다. tool 대안과 registration rule은 `references/external-tool-registry.md`, 자세한 workflow lifecycle command 의미가 필요하면 `references/workflow-lifecycle-commands.md`를 읽는다.
+`.harness-helm/h2-cartridge.yml`이 설치되어 있으면 provider, surface, fallback label, routing target 값과 external tool registry entry의 공통 기준으로 사용한다. target project에 이 파일이 없으면 bundled `references/cartridge-command-mapping.md`는 invocation recording, fallback handling, routing invariant 확인에만 사용한다. tool 대안과 registration rule은 `references/cartridge-tool-registry.md`, 자세한 workflow lifecycle command 의미가 필요하면 `references/workflow-lifecycle-commands.md`를 읽는다.
 
 ## Common Input
 
 Claude Code invocation이 자연어 형태여도 다음 의미를 보존한다:
 
 ```yaml
-command: h2-context | h2-plan | h2-design | h2-analysis | h2-build | h2-test | h2-review | h2-report | h2-compound | h2-archive | h2-ops | h2-cartridge
+command: h2-context | h2-plan | h2-design | h2-autorun | h2-rewind | h2-analysis | h2-build | h2-test | h2-review | h2-report | h2-compound | h2-archive | h2-ops | h2-cartridge
 feature: "<feature-slug or null>"
 task: "<user request or work summary>"
 source_request: "<original request, optional>"
@@ -111,6 +119,7 @@ status: "draft | updated | skipped | blocked"
 context_pack:
   primary_docs: []
   supporting_docs: []
+  canonical_knowledge: []
   excluded_by_policy: []
   assumptions: []
 artifacts:
@@ -138,8 +147,10 @@ Recommended Markdown shape:
 
 ### h2-context
 
-- bundled `references/`의 retrieval policy와 core workflow rule을 사용해 primary/supporting/excluded docs를 선택한다.
+- bundled `references/`의 `0103 Retrieval and Index Policy`와 core workflow rule을 사용해 primary/supporting/excluded docs를 선택한다.
+- 적용 가능한 canonical docs를 `context_pack.canonical_knowledge`에 포함해 compounded knowledge 재투입을 보이게 한다.
 - `docs/_indexes/KB_INDEX.md`가 있으면 읽는다. index가 없거나 stale이면 공식 기준 문서를 직접 확인한다.
+- index absent/stale freshness warning은 `verification.not_verified`에 기록한다. index는 생성하지 않는다.
 - `_indexes`를 생성하지 않는다.
 - context pack을 `.harness-helm/runs/{feature}/{run-id}/context-pack.md` 또는 `.harness-helm/runs/_unscoped/{run-id}/context-pack.md`에 생성하거나 갱신한다. 후속 `h2-*` command는 같은 snapshot을 기준으로 시작한다.
 - `next.recommended_h2_step`을 `null` 또는 사용자 요청에서 암시되는 첫 command로 설정한다.
@@ -159,10 +170,33 @@ Recommended Markdown shape:
 - plan이 없으면 `status: blocked`를 사용하고 누락된 plan을 `verification.required`에 설명한다.
 - `next.recommended_h2_step`을 `h2-analysis`로 설정한다.
 
+### h2-autorun
+
+- preflight로 `h2-context` 의미를 실행하고 이번 autorun을 위한 새 context pack을 만든다. 기존 context pack은 supporting docs로 참조할 수 있다.
+- 시작 전에 `docs/02_design/{feature}.md`가 있어야 한다. design이 없거나 명시적으로 blocked이면 `status: blocked`를 사용한다.
+- `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, `h2-archive`를 이 순서로 실행한다.
+- 각 child step 실행 직전에 `h2-snapshot save` 의미로 pre-step snapshot을 저장해 `h2-rewind`가 해당 단계 경계를 복원할 수 있게 한다.
+- 기본 `h2-review` type은 `code`다. 사용자 입력은 `review=code|qa|security|cross`로 override할 수 있으며, `security`, `qa`, `cross`는 design/test evidence 또는 Cross Review policy 기준이 있을 때만 선택한다.
+- 하위 단계가 `status: blocked`를 반환하면 즉시 중단한다.
+- `verification.not_verified`는 warning으로 요약한다. 단, 사람 review evidence 누락은 summary에서 강조한다.
+- `h2-report`가 `h2-archive`를 추천하는 경우는 일반 next-step mismatch보다 먼저 평가한다. 그래도 `h2-archive` 전 `h2-compound`를 명시적으로 실행한다.
+- `.harness-helm/runs/{feature}/{run-id}/autorun-summary.md`로 route한다.
+- `next.recommended_h2_step`을 `null`로 설정한다.
+
+### h2-rewind
+
+- `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, `h2-archive` 중 특정 `h2-autorun` pre-step snapshot을 복원한다.
+- `feature`, `run-id`, `step`을 요구한다. run id를 추측하지 않는다.
+- snapshot manifest가 없으면 `status: blocked`와 `blocked:no-snapshot`을 사용한다.
+- `docs/_archive/**` 잔존 파일은 자동 삭제하지 않고 warning으로 보존한다.
+- 복원 evidence는 `.harness-helm/runs/{feature}/{run-id}/snapshots/{step}/restore.md`로 route한다.
+- `next.recommended_h2_step`은 복원한 step으로 설정한다.
+
 ### h2-analysis
 
 - plan의 goal/scope/done criteria를 design의 implementation과 verification strategy와 비교한다.
-- 관련 plan/design 내용을 업데이트하거나 정확한 변경 사항을 제안하는 것을 우선한다.
+- analysis 산출물은 `docs/02_design/{feature}.analysis.md`로 route한다.
+- plan/design 불일치, gap, 정확한 alignment 권고를 그 문서에 기록한다.
 - 사람의 판단이 필요한 gap은 `verification.not_verified`에 둔다.
 - `next.recommended_h2_step`을 `h2-build`로 설정한다.
 
@@ -201,6 +235,8 @@ Recommended Markdown shape:
 ### h2-compound
 
 - 완료된 작업에서 reusable knowledge를 축적한다.
+- `.harness-helm/h2-compound.yml`이 있으면 읽어서 domain refinement mode, canonical destination mapping, review gate, retrieval hook policy를 결정한다. 없으면 conservative built-in default를 사용하고 compound artifact에 fallback을 기록한다.
+- `mode=synthesis`, `destination=docs/40_knowledge/solutions` 같은 run-level policy override는 defaults를 바꾸지 않는다. `policy:mode:*`, `policy:destination:*` trace로 기록한다.
 - `docs/40_knowledge/solutions/**` 또는 `docs/40_knowledge/learnings/**` 아래의 low-risk learning/solution 문서는 overlap, schema, lint 확인 후 작성하거나 갱신할 수 있다.
 - `docs/20_specs/**`, `docs/30_decisions/**.accepted.md`, team/runtime convention, operational policy 같은 governed canonical 대상은 owner/verifier 또는 Tech Lead 승인 기록 전까지 staging한다.
 - governed 후보는 `routing.promotion_candidates`에 기록하고, low-risk 작성 결과는 `artifacts.created` 또는 `artifacts.updated`에 기록한다.
@@ -224,7 +260,7 @@ Recommended Markdown shape:
 
 ### h2-cartridge
 
-- `.harness-helm/`이 설치되어 있으면 `.harness-helm/scripts/harness cartridge-validate`를 실행하고, 없으면 bundled `references/upstream-tool-invocation.md`를 확인한다.
+- `.harness-helm/`이 설치되어 있으면 `.harness-helm/scripts/harness cartridge-validate`를 실행하고, 없으면 bundled `references/cartridge-command-mapping.md`에서 invocation recording, fallback handling, routing invariant를 확인한다.
 - 각 command가 `provider`, `surface`, `fallback_label`, `routing_target`을 정의하는지 확인한다.
 - unavailable surface나 invalid surface는 `verification.not_verified` 또는 `verification.required`에 기록한다.
 - `.harness-helm/runs/{feature}/{run-id}/cartridge-mapping.md`로 route한다.
@@ -242,7 +278,7 @@ Recommended Markdown shape:
 ```
 
 - `feature`를 알 수 없으면 `.harness-helm/runs/_unscoped/{run-id}/`를 사용한다.
-- `run-id` format은 `Asia/Seoul` 기준 `{YYYYMMDD-HHMMSS}-{h2-step}`이며 harness script가 검증한다.
+- `run-id` format은 `Asia/Seoul` 기준 `YYYYMMDD-HHMMSS-h2-{command}`이며 harness script가 검증한다.
 - h2 command를 실행하는 runtime adapter가 `raw/`, `normalized/`, `promotion-candidates/`를 생성한다. `harness.py`는 검증하고 정리하지만 모든 lifecycle command마다 생성하지는 않는다.
 - `.harness-helm/runs/**`는 official KB가 아니며 default retrieval input도 아니다.
 - official docs로 옮기기 전에 sensitive/raw output을 제거하거나 mask한다.
@@ -256,7 +292,7 @@ Recommended Markdown shape:
 
 같은 요청에 두 형태가 모두 있으면 key-value가 우선한다.
 
-`references/upstream-selection-and-override.md` 또는 canonical docs guideline `docs/40_knowledge/conventions/guidelines/h2-upstream-selection-and-override.md`에 정의된 선택 우선순위와 기록 규칙을 사용해 override를 적용한다. override 때문에 command routing을 바꾸지 않는다. 결과는 여전히 command의 `routing_target`으로 route되고 command의 h2 template에 기록한다. 입력 provider/surface만 바뀐다. run-level override는 `verification.completed`에 `actual:<provider>:<surface>` 형태로 기록한다. `.harness-helm/h2-cartridge.yml` default를 바꾸지 않는다.
+`references/provider-surface-selection-and-override.md` 또는 canonical docs guideline `docs/40_knowledge/conventions/guidelines/harness-helm/provider-surface-selection-and-override.md`에 정의된 선택 우선순위와 기록 규칙을 사용해 override를 적용한다. override 때문에 command routing을 바꾸지 않는다. 결과는 여전히 command의 `routing_target`으로 route되고 command의 h2 template에 기록한다. 입력 provider/surface만 바뀐다. run-level override는 `verification.completed`에 `actual:<provider>:<surface>` 형태로 기록한다. `.harness-helm/h2-cartridge.yml` default를 바꾸지 않는다.
 
 ## Adapter Rules
 
@@ -297,8 +333,9 @@ harness-helm은 mattpocock 기본값(`CONTEXT.md`와 `docs/adr/`) 대신 HERA wo
 
 - `docs/10_domain/` — 엔티티, 어휘, lifecycle (`CONTEXT.md` 대체)
 - `docs/30_decisions/` — 아키텍처/프로세스 결정 (`docs/adr/` 대체)
-- `docs/40_knowledge/conventions/` — naming, structure, product memory
+- `docs/10_domain/harness-helm/concepts.md` — harness-helm 제품 개념과 어휘
+- `docs/40_knowledge/conventions/` — naming과 structure convention
 - `docs/40_knowledge/references/` — compact external references (`matt-pocock-skills.md` 포함)
 - GitHub Issues — backlog, follow-up, issue 단위 workflow tracking
 
-해당 영역의 문서가 없으면 조용히 진행한다. 새로운 도메인 용어나 결정은 일반적인 h2 workflow(`h2-design`, `h2-report`, `h2-compound`)를 통해 점진적으로 추가된다. output에서 도메인 개념을 명명할 때는 `docs/10_domain/`와 `docs/40_knowledge/conventions/`에 정의된 용어를 사용한다. `docs/40_knowledge/references/`는 비교 참고자료로만 사용하고 harness-helm 권위로 취급하지 않는다. `docs/30_decisions/`의 기존 결정과 모순되는 output을 내야 한다면 묵시적으로 override하지 말고 명시적으로 surface한다.
+해당 영역의 문서가 없으면 조용히 진행한다. 새로운 도메인 용어나 결정은 일반적인 h2 workflow(`h2-design`, `h2-report`, `h2-compound`)를 통해 점진적으로 추가된다. output에서 harness-helm 제품 개념을 명명할 때는 `docs/10_domain/harness-helm/concepts.md`에 정의된 용어를 사용하고, 더 넓은 도메인 용어는 `docs/10_domain/`, convention은 `docs/40_knowledge/conventions/`를 따른다. `docs/40_knowledge/references/`는 비교 참고자료로만 사용하고 harness-helm 기준으로 취급하지 않는다. `docs/30_decisions/`의 기존 결정과 모순되는 output을 내야 한다면 묵시적으로 override하지 말고 명시적으로 surface한다.

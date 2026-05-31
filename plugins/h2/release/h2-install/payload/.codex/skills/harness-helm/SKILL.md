@@ -1,6 +1,6 @@
 ---
 name: harness-helm
-description: Codex adapter for harness-helm h2 workflows. Use for $h2 context, $h2 plan, $h2 design, $h2 analysis, $h2 build, $h2 test, $h2 review, $h2 report, $h2 compound, $h2 archive, $h2 ops, and $h2 cartridge while preserving the 0301-core-workflow-spec command semantics, output fields, staging rules, and docs routing.
+description: Codex adapter for harness-helm h2 workflows. Use for $h2 context, $h2 plan, $h2 design, $h2 autorun, $h2 rewind, $h2 analysis, $h2 build, $h2 test, $h2 review, $h2 report, $h2 compound, $h2 archive, $h2 ops, and $h2 cartridge while preserving the 0301-core-workflow-spec command semantics, output fields, staging rules, and docs routing.
 ---
 
 # harness-helm
@@ -15,15 +15,19 @@ Bundled runtime references:
 - `references/codex-entrypoint.md`: Codex smoke/parity example for runtime parity checks.
 - `references/runtime-parity.md`: `0403 Runtime Parity Test` parity result between Claude Code and Codex.
 - `references/workflow-lifecycle-commands.md`: `0303 Workflow Lifecycle Commands` `h2-*` command semantics.
-- `references/upstream-tool-invocation.md`: `0601 Upstream Tool Invocation` upstream provider/surface/fallback mapping.
-- `references/external-tool-registry.md`: `0602 Upstream Tool Registry` integration targets, alternatives, availability, and registration rules.
-- `references/upstream-surface-map.md`: `0603 Upstream Surface Map` upstream surface recommendations and drift notes.
-- `references/upstream-output-normalization.md`: `0604 Upstream Output Normalization` raw upstream output to h2 template mapping rules.
+- `references/context-pack-contract.md`: `0305 Context Pack Contract` retrieval snapshot rules.
+- `references/runtime-folder-structure.md`: `0503 h2 Runtime Folder Structure` installed runtime and run staging layout.
+- `references/compound-policy-config.md`: `0306 Compound Policy Config` h2-compound write and review-gate policy.
+- `references/h2-rewind-recovery.md`: h2-autorun snapshot and h2-rewind restore boundary rules.
+- `references/cartridge-command-mapping.md`: `0601 Cartridge Command Mapping` invocation recording, fallback handling, and routing invariants.
+- `references/cartridge-tool-registry.md`: `0602 External Tool Registry` integration targets, alternatives, availability, and registration rules.
+- `references/cartridge-surface-map.md`: `0603 Cartridge Surface Map` upstream surface recommendations and drift notes.
+- `references/cartridge-output-normalization.md`: `0604 Cartridge Output Normalization` raw upstream output to h2 template mapping rules.
 - `references/canonical-promotion-flow.md`: runtime snapshot for `h2-compound` promotion approval and canonical write rules.
 - `references/specs-vs-decisions.md`: runtime snapshot for choosing between `20_specs` and `30_decisions`.
-- `references/upstream-selection-and-override.md`: runtime snapshot for run-level upstream override and permanent mapping change.
+- `references/provider-surface-selection-and-override.md`: runtime snapshot for run-level upstream override and permanent mapping change.
 
-Canonical runtime conventions are stored under `docs/40_knowledge/conventions/guidelines/*.md` when docs are installed. Bundled `references/canonical-promotion-flow.md`, `references/specs-vs-decisions.md`, and `references/upstream-selection-and-override.md` provide compact runtime snapshots when those docs are absent or too expensive to load. The meta guideline for choosing snapshot scope remains in `docs/40_knowledge/conventions/guidelines/h2-runtime-reference-selection.md` and is not bundled as a runtime snapshot.
+Canonical runtime conventions are stored under `docs/40_knowledge/conventions/guidelines/*.md` when docs are installed. Bundled `references/canonical-promotion-flow.md`, `references/specs-vs-decisions.md`, and `references/provider-surface-selection-and-override.md` provide compact runtime snapshots when those docs are absent or too expensive to load. The meta guideline for choosing snapshot scope remains in `docs/40_knowledge/conventions/guidelines/harness-helm/runtime-reference-selection.md` and is not bundled as a runtime snapshot.
 
 Base `references/*.md` files are English snapshots for Claude/Codex parity and compact loading. Matching `references/*.ko.md` files are stakeholder Korean translations and must not be loaded into the default agent context; read them only when the user explicitly requests Korean review.
 
@@ -45,13 +49,15 @@ Keep technical identifiers, command names, file paths, frontmatter keys, proper 
 2. Use this `SKILL.md` for canonical `h2-*` command semantics, output fields, staging rules, and docs routing.
 3. Treat `.codex/skills/h2/SKILL.md` as a thin `$h2` alias only.
 4. Load bundled `references/*.md` only when detailed criteria, parity evidence, upstream mapping, normalization, or promotion rules are needed.
-5. Use `.harness-helm/h2-cartridge.yml` for editable provider, surface, fallback, and routing values when installed; otherwise use `references/upstream-tool-invocation.md`.
+5. Use `.harness-helm/h2-cartridge.yml` for editable provider, surface, fallback, and routing values when installed; otherwise use `references/cartridge-command-mapping.md` only for invocation recording, fallback handling, and routing invariants.
+6. Use `.harness-helm/h2-compound.yml` for h2-compound domain refinement, canonical destination, review gate, and retrieval hook policy when installed; if absent, use built-in conservative defaults.
 
 ## Runtime Source Hierarchy
 
 - Source repository design records live in `cookbooks/`, but installed target projects do not include `cookbooks/`.
 - Installed runtime command semantics come from this `SKILL.md`, `references/core-workflow.md`, and `references/workflow-lifecycle-commands.md`.
-- Runtime provider and surface mapping comes from `.harness-helm/h2-cartridge.yml` when installed, with bundled upstream references as fallback.
+- Runtime provider and surface mapping comes from `.harness-helm/h2-cartridge.yml` when installed. Bundled upstream references are fallback guidance for invocation recording, fallback handling, and routing invariants, not cartridge value copies.
+- Runtime h2-compound knowledge policy comes from `.harness-helm/h2-compound.yml` when installed, with built-in conservative defaults as fallback.
 - Runtime schema validation comes from `.harness-helm/h2-schema.yml`.
 - Root `AGENTS.md` provides project-wide entrypoint guidance and must not duplicate the full workflow contract.
 
@@ -86,6 +92,8 @@ Codex must provide these `h2-*` user invocations:
 - `$h2 context`
 - `$h2 plan`
 - `$h2 design`
+- `$h2 autorun`
+- `$h2 rewind`
 - `$h2 analysis`
 - `$h2 build`
 - `$h2 test`
@@ -101,6 +109,8 @@ Internal canonical command ids:
 - `h2-context`
 - `h2-plan`
 - `h2-design`
+- `h2-autorun`
+- `h2-rewind`
 - `h2-analysis`
 - `h2-build`
 - `h2-test`
@@ -111,14 +121,14 @@ Internal canonical command ids:
 - `h2-ops`
 - `h2-cartridge`
 
-Use `.harness-helm/h2-cartridge.yml` as the shared source of truth for provider, surface, fallback label, routing target values, and upstream tool registry entries when it is installed. If it is absent in a target project, use bundled `references/upstream-tool-invocation.md` as the runtime mapping. Load `references/external-tool-registry.md` for tool alternatives and registration rules, and `references/workflow-lifecycle-commands.md` when detailed workflow lifecycle command semantics are needed.
+Use `.harness-helm/h2-cartridge.yml` as the shared source of truth for provider, surface, fallback label, routing target values, and upstream tool registry entries when it is installed. If it is absent in a target project, use bundled `references/cartridge-command-mapping.md` only for invocation recording, fallback handling, and routing invariants. Load `references/cartridge-tool-registry.md` for tool alternatives and registration rules, and `references/workflow-lifecycle-commands.md` when detailed workflow lifecycle command semantics are needed.
 
 ## Common Input
 
 Preserve these meanings even if Codex invocation is natural language:
 
 ```yaml
-command: h2-context | h2-plan | h2-design | h2-analysis | h2-build | h2-test | h2-review | h2-report | h2-compound | h2-archive | h2-ops | h2-cartridge
+command: h2-context | h2-plan | h2-design | h2-autorun | h2-rewind | h2-analysis | h2-build | h2-test | h2-review | h2-report | h2-compound | h2-archive | h2-ops | h2-cartridge
 feature: "<feature-slug or null>"
 task: "<user request or work summary>"
 source_request: "<original request, optional>"
@@ -143,6 +153,7 @@ status: "draft | updated | skipped | blocked"
 context_pack:
   primary_docs: []
   supporting_docs: []
+  canonical_knowledge: []
   excluded_by_policy: []
   assumptions: []
 artifacts:
@@ -170,8 +181,10 @@ Recommended Markdown shape:
 
 ### h2-context
 
-- Select primary/supporting/excluded docs using the retrieval policy and core workflow rules in bundled `references/`.
+- Select primary/supporting/excluded docs using `0103 Retrieval and Index Policy` and core workflow rules in bundled `references/`.
+- Include applicable canonical docs in `context_pack.canonical_knowledge` so compounded knowledge reinjection is visible.
 - Read `docs/_indexes/KB_INDEX.md` when present; if indexes are absent or stale, inspect canonical source docs directly.
+- Record index absent/stale freshness warnings in `verification.not_verified`; do not generate indexes.
 - Do not generate `_indexes`.
 - Generate or update the context pack at `.harness-helm/runs/{feature}/{run-id}/context-pack.md` or `.harness-helm/runs/_unscoped/{run-id}/context-pack.md`; downstream `h2-*` commands should start from the same snapshot.
 - Set `next.recommended_h2_step` to `null` or the first command implied by the user request.
@@ -191,10 +204,33 @@ Recommended Markdown shape:
 - If the plan is missing, use `status: blocked` and explain the missing plan in `verification.required`.
 - Set `next.recommended_h2_step` to `h2-analysis`.
 
+### h2-autorun
+
+- Run `h2-context` meaning as preflight and create a fresh context pack for this autorun; older context packs may be referenced as supporting docs.
+- Require `docs/02_design/{feature}.md` before starting. If the design is missing or explicitly blocked, use `status: blocked`.
+- Execute `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, and `h2-archive` in that order.
+- Before each child step, save the pre-step snapshot using the `h2-snapshot save` meaning so `h2-rewind` can restore that step boundary.
+- Use `code` as the default `h2-review` type. User input may override it with `review=code|qa|security|cross`; select `security`, `qa`, or `cross` only when design/test evidence or Cross Review policy criteria support that route.
+- Stop immediately when a child step returns `status: blocked`.
+- Treat `verification.not_verified` as a warning and summarize it, except that missing human review evidence must be highlighted in the summary.
+- Evaluate the `h2-report` recommendation of `h2-archive` as a special case before generic next-step mismatch; still run `h2-compound` explicitly before `h2-archive`.
+- Route to `.harness-helm/runs/{feature}/{run-id}/autorun-summary.md`.
+- Set `next.recommended_h2_step` to `null`.
+
+### h2-rewind
+
+- Restore a specific `h2-autorun` pre-step snapshot for `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, or `h2-archive`.
+- Require `feature`, `run-id`, and `step`; do not guess a run id.
+- If the snapshot manifest is missing, use `status: blocked` with `blocked:no-snapshot`.
+- Preserve archive residue under `docs/_archive/**` and warn rather than deleting it automatically.
+- Route restore evidence to `.harness-helm/runs/{feature}/{run-id}/snapshots/{step}/restore.md`.
+- Set `next.recommended_h2_step` to the restored step.
+
 ### h2-analysis
 
 - Compare plan goal/scope/done criteria with design implementation and verification strategy.
-- Prefer updating the relevant plan/design content or suggesting exact changes.
+- Route the analysis artifact to `docs/02_design/{feature}.analysis.md`.
+- Record plan/design mismatches, gaps, and exact recommended alignment changes there.
 - Put human-judgment gaps in `verification.not_verified`.
 - Set `next.recommended_h2_step` to `h2-build`.
 
@@ -233,6 +269,8 @@ Recommended Markdown shape:
 ### h2-compound
 
 - Compound reusable knowledge from completed work.
+- Read `.harness-helm/h2-compound.yml` when present to determine domain refinement mode, canonical destination mapping, review gate, and retrieval hook policy. If absent, use conservative built-in defaults and record that fallback in the compound artifact.
+- Run-level policy overrides such as `mode=synthesis` and `destination=docs/40_knowledge/solutions` do not change the defaults; record them with `policy:mode:*` and `policy:destination:*` traces.
 - Low-risk learning/solution docs under `docs/40_knowledge/solutions/**` or `docs/40_knowledge/learnings/**` may be created or updated after overlap, schema, and lint checks.
 - Governed canonical targets such as `docs/20_specs/**`, `docs/30_decisions/**.accepted.md`, team/runtime conventions, and operational policy must be staged until owner/verifier or Tech Lead approval is recorded.
 - Record governed candidates in `routing.promotion_candidates`; record low-risk writes in `artifacts.created` or `artifacts.updated`.
@@ -244,6 +282,7 @@ Recommended Markdown shape:
 - Check whether `h2-compound` has run for this feature by looking for `.harness-helm/runs/{feature}/*/compound-candidates.md`. If no compound evidence exists, run `h2-compound` meaning automatically as preflight before proceeding.
 - Run `.harness-helm/scripts/harness archive {feature}` to execute the archive. Use `--dry-run` to preview changes without applying them.
 - Do not reimplement archive file movement.
+- `harness archive` moves `.harness-helm/runs/{feature}/` to `docs/_archive/{archive-folder}/runs/` rather than deleting it; run artifacts are preserved alongside archived phase docs.
 - After archive completes, run `.harness-helm/scripts/harness kb-index` to refresh `docs/_indexes/*.md` so the new archive manifest entry is registered. Include the regenerated index files in the same archive commit/PR; otherwise `harness-validate` (or equivalent CI) flags an index drift on the next push.
 - Route to `.harness-helm/runs/{feature}/{run-id}/archive-plan.md`.
 - Set `next.recommended_h2_step` to `h2-ops` or `null`.
@@ -256,7 +295,7 @@ Recommended Markdown shape:
 
 ### h2-cartridge
 
-- Run `.harness-helm/scripts/harness cartridge-validate` when `.harness-helm/` is installed; otherwise inspect bundled `references/upstream-tool-invocation.md`.
+- Run `.harness-helm/scripts/harness cartridge-validate` when `.harness-helm/` is installed; otherwise inspect bundled `references/cartridge-command-mapping.md` for invocation recording, fallback handling, and routing invariants.
 - Confirm each command defines `provider`, `surface`, `fallback_label`, and `routing_target`.
 - Record unavailable or invalid surfaces in `verification.not_verified` or `verification.required`.
 - Route to `.harness-helm/runs/{feature}/{run-id}/cartridge-mapping.md`.
@@ -274,9 +313,9 @@ Use the staging rules from this skill and bundled `references/core-workflow.md`:
 ```
 
 - Use `.harness-helm/runs/_unscoped/{run-id}/` when `feature` is unknown.
-- `run-id` format is `{YYYYMMDD-HHMMSS}-{h2-step}` using `Asia/Seoul`, and harness scripts validate it.
+- `run-id` format is `YYYYMMDD-HHMMSS-h2-{command}` using `Asia/Seoul`, and harness scripts validate it.
 - The runtime adapter executing the h2 command creates `raw/`, `normalized/`, and `promotion-candidates/`; `harness.py` validates and cleans them up but does not create them for every lifecycle command.
-- `.harness-helm/runs/**` is not official KB and is not default retrieval input.
+- `.harness-helm/runs/**` is not official KB and is not default retrieval input. On `h2-archive`, the feature runs folder is moved to `docs/_archive/{archive-folder}/runs/` rather than deleted.
 - Remove or mask sensitive/raw output before moving anything to official docs.
 
 ## Upstream Override Input
@@ -288,7 +327,7 @@ Users may override the default upstream provider/surface for a single run. Recog
 
 When both forms appear in the same request, key-value wins.
 
-Apply the override using the selection priority and recording rules defined in `references/upstream-selection-and-override.md` or the canonical docs guideline at `docs/40_knowledge/conventions/guidelines/h2-upstream-selection-and-override.md`. Do not change command routing because of an override. The result is still routed to the command's `routing_target` and recorded via the command's h2 template; only the input provider/surface changes. Record run-level overrides in `verification.completed` (`actual:<provider>:<surface>`) and never as a change to `.harness-helm/h2-cartridge.yml` defaults.
+Apply the override using the selection priority and recording rules defined in `references/provider-surface-selection-and-override.md` or the canonical docs guideline at `docs/40_knowledge/conventions/guidelines/harness-helm/provider-surface-selection-and-override.md`. Do not change command routing because of an override. The result is still routed to the command's `routing_target` and recorded via the command's h2 template; only the input provider/surface changes. Record run-level overrides in `verification.completed` (`actual:<provider>:<surface>`) and never as a change to `.harness-helm/h2-cartridge.yml` defaults.
 
 ## Codex Adapter Rules
 
@@ -331,8 +370,9 @@ harness-helm uses the HERA workflow layout instead of the mattpocock defaults (`
 
 - `docs/10_domain/` — entities, vocabulary, lifecycle (replaces `CONTEXT.md`)
 - `docs/30_decisions/` — architectural and process decisions (replaces `docs/adr/`)
-- `docs/40_knowledge/conventions/` — naming, structure, product memory
+- `docs/10_domain/harness-helm/concepts.md` — harness-helm product concepts and vocabulary
+- `docs/40_knowledge/conventions/` — naming and structure conventions
 - `docs/40_knowledge/references/` — compact external references, including `matt-pocock-skills.md`
 - GitHub Issues — backlog, follow-ups, and issue-level workflow tracking
 
-If any of these are missing for the area you're touching, proceed silently — new domain terms and decisions get added lazily through the normal h2 workflow (`h2-design`, `h2-report`, `h2-compound`). When your output names a domain concept, use the term as defined under `docs/10_domain/` and `docs/40_knowledge/conventions/`. Use `docs/40_knowledge/references/` as comparison material, not as harness-helm authority. If your output contradicts an existing decision in `docs/30_decisions/`, surface it explicitly rather than silently overriding.
+If any of these are missing for the area you're touching, proceed silently — new domain terms and decisions get added lazily through the normal h2 workflow (`h2-design`, `h2-report`, `h2-compound`). When your output names a harness-helm product concept, use the term as defined under `docs/10_domain/harness-helm/concepts.md`; use broader domain terms from `docs/10_domain/` and conventions from `docs/40_knowledge/conventions/`. Use `docs/40_knowledge/references/` as comparison material, not as harness-helm authority. If your output contradicts an existing decision in `docs/30_decisions/`, surface it explicitly rather than silently overriding.

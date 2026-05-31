@@ -20,7 +20,7 @@ Expected frontmatter follows `.harness-helm/h2-schema.yml` and `docs/_templates/
 
 ## Retrieval Policy
 
-Draft and active plan documents are working context. They are not canonical knowledge until later review or promotion. Follow the retrieval policy in `cookbooks/0100-knowledge-base-foundation/0103-retrieval-policy.md` when selecting context.
+Draft and active plan documents are working context. They are not canonical knowledge until later review or promotion. Follow the retrieval policy in `cookbooks/0100-knowledge-base-foundation/0103-retrieval-and-index-policy.md` when selecting context.
 
 ## Coexistence
 

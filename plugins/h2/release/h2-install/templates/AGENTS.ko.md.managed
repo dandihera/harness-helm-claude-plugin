@@ -2,7 +2,7 @@
 
 ## harness-helm
 
-- `h2`는 `harness-helm`의 짧은 alias입니다. 기준 정의는 `docs/40_knowledge/conventions/h2-product-memory.md`의 `## h2`를 따릅니다.
+- `h2`는 `harness-helm`의 짧은 alias입니다. 기준 정의는 `docs/10_domain/harness-helm/concepts.md`의 `## h2`를 따릅니다.
 - `h2-*` 워크플로는 `.harness-helm/h2-cartridge.yml`을 통해 라우팅합니다.
 - AI-native engineering workflow에는 `h2-*` 명령(plan, design, analysis, build, test, review, report, compound, archive, ops, context, cartridge)을 사용합니다.
 - Workflow artifacts는 `docs/01_plan`, `docs/02_design`, `docs/03_review`, `docs/04_report`에 둡니다.
