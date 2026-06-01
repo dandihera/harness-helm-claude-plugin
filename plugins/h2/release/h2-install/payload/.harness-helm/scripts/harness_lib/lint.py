@@ -83,7 +83,7 @@ def command_lint(args: argparse.Namespace) -> int:
         if invalid_modules:
             hard.append(f"{doc.rel}: invalid module values: {', '.join(invalid_modules)}")
         if not list_value(fm.get("tags")):
-            warnings.append(f"{doc.rel}: tags missing; TAG_INDEX routing may be weak.")
+            warnings.append(f"{doc.rel}: tags missing; tag-based search-time retrieval may be weak.")
         if not (fm.get("source_trace") or fm.get("source_pr")) and fm.get("type") in {"plan", "design", "analysis", "report"}:
             warnings.append(f"{doc.rel}: PDCA doc has no source_trace/source_pr.")
         if is_compound_generated_doc(doc):
@@ -95,4 +95,3 @@ def command_lint(args: argparse.Namespace) -> int:
 
     print_report("kb-lint", hard, warnings)
     return 1 if hard and args.strict else 0
-

@@ -38,14 +38,6 @@ def command_index(args: argparse.Namespace) -> int:
     rejected = [
         doc for doc in docs if doc.rel.startswith("docs/30_decisions/") and doc.path.name.endswith(".rejected.md")
     ]
-    archives = [
-        doc
-        for doc in docs
-        if is_archive(doc)
-        and doc.path.name.lower() in {"manifest.md", "_index.md"}
-        and "/runs/" not in doc.rel
-    ]
-
     generated_header = schema["generated_header"]
     kb = [generated_header, "", "# KB Index", ""]
     for doc in indexed:
@@ -55,10 +47,6 @@ def command_index(args: argparse.Namespace) -> int:
         for doc in rejected:
             phrases = ", ".join(list_value(doc.frontmatter.get("ai_avoid_phrases"))) or "see document"
             kb.append(f"- [{doc.title}]({paths.rel_link('../' + doc.rel.removeprefix('docs/'))}) — avoid: {phrases}")
-    if archives:
-        kb.extend(["", "## Archive Manifest", ""])
-        for doc in archives:
-            kb.append(minimal_line(doc))
     write_text(target / "KB_INDEX.md", "\n".join(kb) + "\n")
 
     domains = schema["domains"]

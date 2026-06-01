@@ -2,12 +2,12 @@
 schema_version: 1
 id: SOL-20260530-001
 type: solution
-status: pending
+status: verified
 owner: 장태욱
 security: internal
 confidence: medium
 related:
-  - docs/02_design/h2-plugin-claude-code.md
+  - docs/_archive/2026-05/0530-004105_h2-plugin-claude-code/h2-plugin-claude-code.design.md
   - .harness-helm/runs/h2-plugin-claude-code/20260530-000047-h2-build/build.md
 module:
   - workflow

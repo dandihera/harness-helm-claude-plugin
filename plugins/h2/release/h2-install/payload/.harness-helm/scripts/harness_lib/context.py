@@ -142,13 +142,13 @@ def index_freshness(index_paths: list[Path], candidates: list[Doc]) -> tuple[str
     if missing:
         return "absent", f"index freshness: {', '.join(missing)} 없음; canonical docs direct scan fallback을 사용했다."
     if not candidates:
-        return "ok", "index freshness: index가 존재하며 freshness 비교 대상 canonical docs가 없다."
+        return "ok", "index freshness: KB_INDEX + DOMAIN_INDEX가 존재하며 freshness 비교 대상 canonical docs가 없다."
 
     oldest_index = min(path.stat().st_mtime for path in index_paths)
     newest_candidate = max(doc.path.stat().st_mtime for doc in candidates)
     if newest_candidate > oldest_index:
-        return "stale", "index freshness: canonical docs가 docs/_indexes보다 최신이다. `.harness-helm/scripts/harness kb-index`를 실행한다."
-    return "ok", "index freshness: docs/_indexes가 존재하며 canonical docs보다 오래되지 않았다."
+        return "stale", "index freshness: canonical docs가 KB_INDEX + DOMAIN_INDEX보다 최신이다. `.harness-helm/scripts/harness kb-index`를 실행한다."
+    return "ok", "index freshness: KB_INDEX + DOMAIN_INDEX가 존재하며 canonical docs보다 오래되지 않았다."
 
 
 def docs_matching_canonical_knowledge(
@@ -232,7 +232,7 @@ def command_context(args: argparse.Namespace) -> int:
     tokens = tokenize_task(args.task)
     feature_doc_rels = {doc.rel for doc in feature_docs}
     task_docs = docs_matching_task(tokens, docs, schema, feature_doc_rels)
-    index_docs = [paths.DOCS / "_indexes" / name for name in ("KB_INDEX.md", "DOMAIN_INDEX.md", "TAG_INDEX.md")]
+    index_docs = [paths.DOCS / "_indexes" / name for name in ("KB_INDEX.md", "DOMAIN_INDEX.md")]
     canonical_candidates = canonical_docs(docs, schema)
     freshness_state, freshness_line = index_freshness(index_docs, canonical_candidates)
     canonical_entries = [
