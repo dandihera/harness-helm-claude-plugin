@@ -18,15 +18,15 @@ next:
 
 ### supporting_docs
 
-- <TODO: context pack path>
+- <TODO: context pack 경로>
 
 ### excluded_by_policy
 
-- <TODO: excluded docs>
+- <TODO: 제외된 문서>
 
 ### assumptions
 
-- <TODO: autorun assumptions>
+- <TODO: autorun 가정>
 
 ## Autorun Plan
 
@@ -56,7 +56,7 @@ next:
 
 ## Blocked Reason
 
-- <TODO: blocked step and reason, or none>
+- <TODO: blocked 단계와 사유. 없으면 <없음>>
 
 ## Verification
 

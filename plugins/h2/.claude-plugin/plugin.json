@@ -1,7 +1,7 @@
 {
   "name": "h2",
   "description": "h2 workflow adapter for Claude Code. Installs Claude Code skills and provides explicit target-project bootstrap.",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "author": {
     "name": "dandisoft"
   },

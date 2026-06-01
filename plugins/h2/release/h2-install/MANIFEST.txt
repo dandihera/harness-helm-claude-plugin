@@ -25,6 +25,7 @@ copy      payload/.harness-helm/h2-cartridge.yml                   .harness-helm
 copy      payload/.harness-helm/h2-compound.yml                    .harness-helm/h2-compound.yml
 copy      payload/.harness-helm/h2-schema.yml                      .harness-helm/h2-schema.yml
 copy      payload/.harness-helm/scripts/harness.py                 .harness-helm/scripts/harness.py
+copy_dir  payload/.harness-helm/scripts/harness_lib/               .harness-helm/scripts/harness_lib/
 copy      payload/.harness-helm/scripts/harness                    .harness-helm/scripts/harness
 copy      payload/.harness-helm/scripts/kb-index.sh                .harness-helm/scripts/kb-index.sh
 copy      payload/.harness-helm/scripts/kb-lint.sh                 .harness-helm/scripts/kb-lint.sh

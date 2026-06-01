@@ -61,13 +61,13 @@ docs/_archive/<TODO: YYYY-MM>/<TODO: feature>/
 ## Artifacts
 
 ### created
-- <TODO: archive dry-run plan 또는 manifest 후보>
+- <TODO: archive dry-run 계획 또는 manifest 후보>
 
 ### updated
 - <TODO: archive 준비 중 갱신된 문서>
 
 ### suggested
-- <TODO: close 전 필요한 archive follow-up>
+- <TODO: close 전 필요한 archive 후속 조치>
 
 ## Routing
 

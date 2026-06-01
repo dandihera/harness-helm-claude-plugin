@@ -108,7 +108,7 @@ approval:
     - <TODO: docs/01_plan/{feature}.md>
     - <TODO: docs/04_report/{feature}.md>
   notes:
-    - <TODO: Candidate approved for canonical promotion.>
+    - <TODO: canonical 승격 승인 기록>
 ```
 
 승인 status enum: `approved | pending | rejected`. ambiguous 또는 사람 검토 필요면 `pending` 유지. rejected 항목은 docs/30_decisions/{NNNN}-{topic}.rejected.md로 별도 기록 가능.

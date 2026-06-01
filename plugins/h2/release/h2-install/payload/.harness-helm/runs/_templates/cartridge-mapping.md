@@ -1,6 +1,6 @@
 ---
 command: h2-cartridge
-feature: "<TODO: feature-slug or null>"
+feature: "<TODO: feature-slug 또는 null>"
 status: draft
 next:
   recommended_h2_step: null
@@ -16,7 +16,7 @@ next:
 
 ### primary_docs
 - `.harness-helm/h2-cartridge.yml`
-- <TODO: 관련 references (예: `.claude/skills/harness-helm/references/upstream-tool-invocation.md`)>
+- <TODO: 관련 reference 경로 (예: `.claude/skills/harness-helm/references/upstream-tool-invocation.md`)>
 
 ## Effective Mapping Snapshot
 
@@ -50,13 +50,13 @@ next:
 ## Artifacts
 
 ### created
-- <TODO: cartridge mapping validation artifact>
+- <TODO: cartridge mapping 검증 산출물>
 
 ### updated
 - <TODO: .harness-helm/h2-cartridge.yml 변경 여부>
 
 ### suggested
-- <TODO: surface/fallback follow-up>
+- <TODO: surface/fallback 후속 조치>
 
 ## Routing
 

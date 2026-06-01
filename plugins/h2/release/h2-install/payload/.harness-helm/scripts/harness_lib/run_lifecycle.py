@@ -1,0 +1,593 @@
+from __future__ import annotations
+
+import dataclasses
+import datetime as dt
+import json
+import argparse
+from pathlib import Path
+from typing import Any
+
+from . import paths
+from .frontmatter import list_value, parse_frontmatter, raw_list_value
+from .utils import now_kst
+
+
+RUNTIME_SUMMARY_NAME = "runtime-summary.json"
+RUN_MANIFEST_NAME = "manifest.json"
+RUN_MANIFEST_FIELD_ORDER = [
+    "schema_version",
+    "type",
+    "feature",
+    "run_id",
+    "command",
+    "status",
+    "started_at",
+    "completed_at",
+    "autorun_id",
+    "artifact_paths",
+    "task",
+]
+EXPECTED_COMMANDS = {
+    "h2-context",
+    "h2-plan",
+    "h2-design",
+    "h2-autorun",
+    "h2-rewind",
+    "h2-analysis",
+    "h2-report",
+    "h2-cartridge",
+    "h2-build",
+    "h2-test",
+    "h2-review",
+    "h2-compound",
+    "h2-archive",
+    "h2-ops",
+}
+
+
+def run_id(command: str) -> str:
+    return f"{now_kst().strftime('%Y%m%d-%H%M%S')}-{command}"
+
+
+def run_root(feature: str | None, run_id_value: str) -> Path:
+    paths.validate_run_id(run_id_value)
+    feature_dir = paths.safe_path_segment(feature or "_unscoped", "feature")
+    return paths.ROOT / ".harness-helm" / "runs" / feature_dir / run_id_value
+
+
+def run_manifest_path(feature: str | None, run_id_value: str) -> Path:
+    return run_root(feature, run_id_value) / RUN_MANIFEST_NAME
+
+
+def command_from_run_id(run_id_value: str) -> str:
+    paths.validate_run_id(run_id_value)
+    return run_id_value.split("-", 2)[2]
+
+
+def validate_h2_command(command: str) -> str:
+    if command not in EXPECTED_COMMANDS:
+        raise ValueError(f"invalid h2 command: {command}")
+    return command
+
+
+def format_run_timestamp(value: dt.datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=dt.timezone(dt.timedelta(hours=9)))
+    return value.isoformat(timespec="seconds")
+
+
+def started_at_from_run_id(run_id_value: str) -> dt.datetime:
+    paths.validate_run_id(run_id_value)
+    raw = run_id_value[:15]
+    return dt.datetime.strptime(raw, "%Y%m%d-%H%M%S").replace(tzinfo=dt.timezone(dt.timedelta(hours=9)))
+
+
+def parse_run_timestamp(value: Any) -> dt.datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone(dt.timedelta(hours=9)))
+    return parsed
+
+
+def load_run_manifest(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError(f"invalid run manifest JSON: {paths.display_path(path)}: {error.msg}") from error
+    if not isinstance(manifest, dict):
+        raise ValueError(f"run manifest must be a JSON object: {paths.display_path(path)}")
+    return manifest
+
+
+def ordered_run_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    ordered = {key: manifest[key] for key in RUN_MANIFEST_FIELD_ORDER if key in manifest}
+    for key in manifest:
+        if key not in ordered:
+            ordered[key] = manifest[key]
+    return ordered
+
+
+def write_run_manifest(path: Path, manifest: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(ordered_run_manifest(manifest), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def start_run_manifest(
+    feature: str | None,
+    run_id_value: str,
+    command: str,
+    task: str | None = None,
+    autorun_id: str | None = None,
+) -> Path:
+    path = run_manifest_path(feature, run_id_value)
+    existing = load_run_manifest(path)
+    safe_feature = paths.safe_path_segment(feature, "feature") if feature else "_unscoped"
+    safe_run_id = paths.validate_run_id(run_id_value)
+    safe_command = validate_h2_command(command)
+    existing_status = existing.get("status")
+    should_reset_timing = existing_status in {"completed", "failed", "incomplete"} or existing.get("completed_at") is not None
+    started_at = existing.get("started_at")
+    manifest = {
+        "schema_version": 1,
+        "type": "run-manifest",
+        "feature": safe_feature,
+        "run_id": safe_run_id,
+        "command": safe_command,
+        "status": "running",
+        "started_at": format_run_timestamp(now_kst()) if should_reset_timing or not started_at else started_at,
+        "completed_at": None,
+        "autorun_id": paths.validate_run_id(autorun_id) if autorun_id is not None else existing.get("autorun_id"),
+        "artifact_paths": existing.get("artifact_paths", []),
+    }
+    if task:
+        manifest["task"] = task
+    write_run_manifest(path, manifest)
+    return path
+
+
+def complete_run_manifest(
+    feature: str | None,
+    run_id_value: str,
+    status: str = "completed",
+    artifact_paths: list[str] | None = None,
+) -> Path:
+    if status not in {"completed", "failed", "incomplete"}:
+        raise ValueError("status must be completed, failed, or incomplete.")
+    root = run_root(feature, run_id_value)
+    if not root.exists():
+        raise FileNotFoundError(f"run folder does not exist: {paths.repository_rel(root)}")
+    path = run_manifest_path(feature, run_id_value)
+    manifest = load_run_manifest(path)
+    safe_feature = paths.safe_path_segment(feature, "feature") if feature else "_unscoped"
+    safe_run_id = paths.validate_run_id(run_id_value)
+    if not manifest:
+        manifest = {
+            "schema_version": 1,
+            "type": "run-manifest",
+            "feature": safe_feature,
+            "run_id": safe_run_id,
+            "command": command_from_run_id(safe_run_id),
+            "started_at": format_run_timestamp(started_at_from_run_id(safe_run_id)),
+            "autorun_id": None,
+            "artifact_paths": [],
+        }
+    manifest.setdefault("schema_version", 1)
+    manifest.setdefault("type", "run-manifest")
+    manifest.setdefault("feature", safe_feature)
+    manifest.setdefault("run_id", safe_run_id)
+    manifest.setdefault("command", command_from_run_id(safe_run_id))
+    manifest.setdefault("started_at", format_run_timestamp(started_at_from_run_id(safe_run_id)))
+    manifest.setdefault("autorun_id", None)
+    existing = list_value(manifest.get("artifact_paths"))
+    for artifact in artifact_paths or []:
+        if artifact not in existing:
+            existing.append(artifact)
+    manifest["status"] = status
+    manifest["completed_at"] = None if status == "incomplete" else format_run_timestamp(now_kst())
+    manifest["artifact_paths"] = existing
+    write_run_manifest(path, manifest)
+    return path
+
+
+@dataclasses.dataclass
+class RunStatsEntry:
+    feature: str
+    run_id: str
+    command: str
+    status: str
+    started_at: dt.datetime | None
+    completed_at: dt.datetime | None
+    elapsed_seconds: int | None
+    manifest_path: Path | None
+    warnings: list[str]
+    autorun_id: str | None
+
+
+def iter_run_dirs(feature: str | None = None) -> list[Path]:
+    root = paths.ROOT / ".harness-helm" / "runs"
+    if not root.exists():
+        return []
+    feature_dirs = [root / paths.safe_path_segment(feature, "feature")] if feature else [
+        path for path in sorted(root.iterdir()) if path.is_dir() and path.name != "_templates"
+    ]
+    run_dirs: list[Path] = []
+    for feature_dir in feature_dirs:
+        if not feature_dir.exists() or not feature_dir.is_dir():
+            continue
+        for path in sorted(feature_dir.iterdir()):
+            if path.is_dir() and paths.RUN_ID_PATTERN.match(path.name):
+                run_dirs.append(path)
+    return run_dirs
+
+
+def resolve_existing_dir(value: str) -> Path | None:
+    path = Path(value).expanduser()
+    candidates = [path] if path.is_absolute() else [paths.ROOT / path, path]
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_dir():
+            return candidate.resolve()
+    return None
+
+
+def archive_feature(archive_path: Path) -> str:
+    manifest_path = archive_path / "manifest.md"
+    if manifest_path.exists():
+        frontmatter, _ = parse_frontmatter(manifest_path.read_text(encoding="utf-8"))
+        feature = frontmatter.get("feature")
+        if isinstance(feature, str) and feature:
+            return feature
+    return archive_path.name.split("_", 1)[-1]
+
+
+def iter_archive_run_dirs(archive_path: Path) -> list[Path]:
+    runs = archive_path / "runs"
+    if not runs.exists() or not runs.is_dir():
+        return []
+    return sorted(
+        path
+        for path in runs.iterdir()
+        if path.is_dir()
+        and paths.RUN_ID_PATTERN.match(path.name)
+        and ((path / RUN_MANIFEST_NAME).exists() or (path / "manifest.md").exists() or (path / "context-pack.md").exists())
+    )
+
+
+def is_archive_run_stats_path(path: Path) -> bool:
+    return (path / "runs").is_dir() and (path / "manifest.md").exists()
+
+
+def build_run_stats_entry(run_dir: Path, feature_override: str | None = None) -> RunStatsEntry:
+    feature = feature_override or run_dir.parent.name
+    run_id_value = run_dir.name
+    manifest_path = run_dir / RUN_MANIFEST_NAME
+    manifest_exists = manifest_path.exists()
+    manifest = load_run_manifest(manifest_path)
+    warnings: list[str] = []
+    run_id_started_at = started_at_from_run_id(run_id_value)
+    manifest_started_at = parse_run_timestamp(manifest.get("started_at"))
+    started_at = manifest_started_at or run_id_started_at
+    if manifest_started_at and abs((manifest_started_at - run_id_started_at).total_seconds()) >= 1:
+        warnings.append("started_at differs from run-id timestamp")
+    if not manifest:
+        return RunStatsEntry(
+            feature=feature,
+            run_id=run_id_value,
+            command=command_from_run_id(run_id_value),
+            status="missing-manifest",
+            started_at=started_at,
+            completed_at=None,
+            elapsed_seconds=None,
+            manifest_path=None,
+            warnings=warnings,
+            autorun_id=None,
+        )
+    completed_at = parse_run_timestamp(manifest.get("completed_at"))
+    command = str(manifest.get("command") or command_from_run_id(run_id_value))
+    status = str(manifest.get("status") or "incomplete") if manifest_exists else "missing-manifest"
+    elapsed = None
+    if completed_at and started_at and status not in {"missing-manifest", "running", "incomplete"}:
+        elapsed = max(0, int((completed_at - started_at).total_seconds()))
+    return RunStatsEntry(
+        feature=str(manifest.get("feature") or feature),
+        run_id=str(manifest.get("run_id") or run_id_value),
+        command=command,
+        status=status,
+        started_at=started_at,
+        completed_at=completed_at,
+        elapsed_seconds=elapsed,
+        manifest_path=manifest_path if manifest_exists else None,
+        warnings=warnings,
+        autorun_id=manifest.get("autorun_id") if isinstance(manifest.get("autorun_id"), str) else None,
+    )
+
+
+def apply_archive_elapsed_fallback(entries: list[RunStatsEntry]) -> None:
+    ordered = sorted(entries, key=lambda entry: entry.started_at or dt.datetime.max.replace(tzinfo=dt.timezone.utc))
+    for index, entry in enumerate(ordered):
+        if entry.elapsed_seconds is not None or entry.started_at is None:
+            continue
+        next_started_at = None
+        for next_entry in ordered[index + 1 :]:
+            if next_entry.started_at:
+                next_started_at = next_entry.started_at
+                break
+        if next_started_at is None:
+            continue
+        entry.completed_at = next_started_at
+        entry.elapsed_seconds = max(0, int((next_started_at - entry.started_at).total_seconds()))
+        entry.status = "estimated"
+        entry.warnings.append("elapsed estimated from next run start because manifest completed_at is missing")
+
+
+def format_elapsed(seconds: int | None, status: str) -> str:
+    if seconds is None:
+        if status in {"running", "incomplete", "missing-manifest"}:
+            return status
+        return "not available"
+    minutes, sec = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h {minutes:02d}m {sec:02d}s"
+    if minutes:
+        return f"{minutes}m {sec:02d}s"
+    return f"{sec}s"
+
+
+def run_stats_to_dict(entry: RunStatsEntry) -> dict[str, Any]:
+    return {
+        "feature": entry.feature,
+        "run_id": entry.run_id,
+        "command": entry.command,
+        "status": entry.status,
+        "started_at": entry.started_at.isoformat() if entry.started_at else None,
+        "completed_at": entry.completed_at.isoformat() if entry.completed_at else None,
+        "elapsed_seconds": entry.elapsed_seconds,
+        "elapsed": format_elapsed(entry.elapsed_seconds, entry.status),
+        "autorun_id": entry.autorun_id,
+        "manifest_path": paths.display_path(entry.manifest_path) if entry.manifest_path else None,
+        "warnings": entry.warnings,
+    }
+
+
+def run_stats_entry_from_dict(item: dict[str, Any]) -> RunStatsEntry:
+    manifest_path = item.get("manifest_path")
+    resolved_manifest_path = None
+    if isinstance(manifest_path, str) and manifest_path:
+        path = Path(manifest_path)
+        resolved_manifest_path = path if path.is_absolute() else paths.ROOT / path
+    return RunStatsEntry(
+        feature=str(item.get("feature") or ""),
+        run_id=str(item.get("run_id") or ""),
+        command=str(item.get("command") or ""),
+        status=str(item.get("status") or ""),
+        started_at=parse_run_timestamp(item.get("started_at")),
+        completed_at=parse_run_timestamp(item.get("completed_at")),
+        elapsed_seconds=item.get("elapsed_seconds") if isinstance(item.get("elapsed_seconds"), int) else None,
+        manifest_path=resolved_manifest_path,
+        warnings=[str(warning) for warning in list_value(item.get("warnings"))],
+        autorun_id=item.get("autorun_id") if isinstance(item.get("autorun_id"), str) else None,
+    )
+
+
+def latest_activity(entry: RunStatsEntry) -> dt.datetime:
+    return entry.completed_at or entry.started_at or dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+
+
+def autorun_groups(entries: list[RunStatsEntry]) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    by_key: dict[tuple[str, str], list[RunStatsEntry]] = {}
+    for entry in entries:
+        if entry.autorun_id and entry.elapsed_seconds is not None and entry.started_at and entry.completed_at:
+            by_key.setdefault((entry.feature, entry.autorun_id), []).append(entry)
+    for (feature, autorun_id), grouped in sorted(by_key.items()):
+        starts = [entry.started_at for entry in grouped if entry.started_at]
+        ends = [entry.completed_at for entry in grouped if entry.completed_at]
+        if not starts or not ends:
+            continue
+        total = max(0, int((max(ends) - min(starts)).total_seconds()))
+        groups.append(
+            {
+                "feature": feature,
+                "autorun_id": autorun_id,
+                "stage_count": len(grouped),
+                "started_at": format_run_timestamp(min(starts)),
+                "completed_at": format_run_timestamp(max(ends)),
+                "elapsed_seconds": total,
+                "elapsed": format_elapsed(total, "completed"),
+            }
+        )
+    return groups
+
+
+def archive_wall_clock(entries: list[RunStatsEntry]) -> int | None:
+    completed_entries = [entry for entry in entries if entry.started_at and entry.completed_at]
+    if not completed_entries:
+        return None
+    starts = [entry.started_at for entry in completed_entries if entry.started_at]
+    ends = [entry.completed_at for entry in completed_entries if entry.completed_at]
+    return max(0, int((max(ends) - min(starts)).total_seconds()))
+
+
+def build_archive_runtime_summary(archive_path: Path, generated_at: dt.datetime | None = None) -> dict[str, Any]:
+    feature = archive_feature(archive_path)
+    entries = [build_run_stats_entry(path, feature_override=feature) for path in iter_archive_run_dirs(archive_path)]
+    apply_archive_elapsed_fallback(entries)
+    entries.sort(key=latest_activity)
+    total_elapsed_seconds = sum(entry.elapsed_seconds or 0 for entry in entries)
+    wall_clock_seconds = archive_wall_clock(entries)
+    warnings = sorted({warning for entry in entries for warning in entry.warnings})
+    archive_rel = paths.repository_rel(archive_path)
+    summary: dict[str, Any] = {
+        "schema_version": 1,
+        "type": "runtime-summary",
+        "feature": feature,
+        "archive_path": archive_rel,
+        "generated_at": format_run_timestamp(generated_at or now_kst()),
+        "generated_from": "h2-archive",
+        "runs": [run_stats_to_dict(entry) for entry in entries],
+        "total_elapsed_seconds": total_elapsed_seconds,
+        "total_elapsed": format_elapsed(total_elapsed_seconds, "completed"),
+        "archive_wall_clock_seconds": wall_clock_seconds,
+        "archive_wall_clock": format_elapsed(wall_clock_seconds, "completed") if wall_clock_seconds is not None else None,
+        "autorun_groups": autorun_groups(entries),
+        "warnings": warnings,
+    }
+    summary["totals"] = {
+        "stage_elapsed_seconds": total_elapsed_seconds,
+        "stage_elapsed": summary["total_elapsed"],
+        "archive_wall_clock_seconds": wall_clock_seconds,
+        "archive_wall_clock": summary["archive_wall_clock"],
+    }
+    return summary
+
+
+def write_runtime_summary(archive_path: Path, generated_at: dt.datetime | None = None) -> Path:
+    path = archive_path / RUNTIME_SUMMARY_NAME
+    summary = build_archive_runtime_summary(archive_path, generated_at)
+    summary["summary_path"] = paths.repository_rel(path)
+    path.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def load_runtime_summary(archive_path: Path) -> dict[str, Any] | None:
+    path = archive_path / RUNTIME_SUMMARY_NAME
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def command_run_mark(args: argparse.Namespace) -> int:
+    try:
+        if args.run_mark_action == "start":
+            path = start_run_manifest(
+                args.feature,
+                args.run_id,
+                args.h2_command,
+                task=args.task,
+                autorun_id=args.autorun_id,
+            )
+            print(f"run-mark start: wrote {paths.repository_rel(path)}")
+            return 0
+        if args.run_mark_action == "complete":
+            path = complete_run_manifest(
+                args.feature,
+                args.run_id,
+                status=args.status,
+                artifact_paths=args.artifact,
+            )
+            print(f"run-mark complete: wrote {paths.repository_rel(path)}")
+            return 0
+    except (FileNotFoundError, ValueError) as error:
+        print(f"run-mark {args.run_mark_action}: {error}")
+        return 1
+    print(f"run-mark: unknown action {args.run_mark_action}")
+    return 1
+
+
+def command_run_stats(args: argparse.Namespace) -> int:
+    archive_path = resolve_existing_dir(args.feature) if args.feature else None
+    archive_label: str | None = None
+    runtime_summary: dict[str, Any] | None = None
+    if archive_path and is_archive_run_stats_path(archive_path):
+        runtime_summary = load_runtime_summary(archive_path)
+        if runtime_summary:
+            entries = [
+                run_stats_entry_from_dict(item)
+                for item in raw_list_value(runtime_summary.get("runs"))
+                if isinstance(item, dict)
+            ]
+        else:
+            feature = archive_feature(archive_path)
+            entries = [build_run_stats_entry(path, feature_override=feature) for path in iter_archive_run_dirs(archive_path)]
+            apply_archive_elapsed_fallback(entries)
+        archive_label = paths.repository_rel(archive_path)
+    else:
+        entries = [build_run_stats_entry(path) for path in iter_run_dirs(args.feature)]
+    entries.sort(key=latest_activity, reverse=not archive_label)
+    limit = args.limit
+    if args.feature:
+        selected = entries[:limit]
+        payload = {
+            "feature": runtime_summary.get("feature") if runtime_summary else archive_feature(archive_path) if archive_path and archive_label else args.feature,
+            "archive_path": archive_label,
+            "runs": [run_stats_to_dict(entry) for entry in selected],
+            "total_elapsed_seconds": sum(entry.elapsed_seconds or 0 for entry in selected),
+            "autorun_groups": autorun_groups(selected),
+        }
+        if runtime_summary:
+            payload["summary_path"] = runtime_summary.get("summary_path")
+            payload["generated_at"] = runtime_summary.get("generated_at")
+            payload["total_elapsed_seconds"] = runtime_summary.get("total_elapsed_seconds")
+            payload["total_elapsed"] = runtime_summary.get("total_elapsed")
+            payload["archive_wall_clock_seconds"] = runtime_summary.get("archive_wall_clock_seconds")
+            payload["archive_wall_clock"] = runtime_summary.get("archive_wall_clock")
+            payload["autorun_groups"] = raw_list_value(runtime_summary.get("autorun_groups"))
+            payload["warnings"] = list_value(runtime_summary.get("warnings"))
+        elif archive_label:
+            archive_total = archive_wall_clock(selected)
+            if archive_total is not None:
+                payload["archive_wall_clock_seconds"] = archive_total
+                payload["archive_wall_clock"] = format_elapsed(archive_total, "completed")
+        if args.json:
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0
+        print(f"feature: {payload['feature']}")
+        if archive_label:
+            print(f"archive: {archive_label}")
+        if payload.get("summary_path"):
+            print(f"summary: {payload['summary_path']}")
+        print("")
+        print("  run-id                    command      status            elapsed")
+        for entry in selected:
+            print(
+                f"  {entry.run_id:<25} {entry.command:<12} {entry.status:<17} "
+                f"{format_elapsed(entry.elapsed_seconds, entry.status)}"
+            )
+        total = payload["total_elapsed_seconds"]
+        print("")
+        print(f"  total: {payload.get('total_elapsed') or format_elapsed(total if isinstance(total, int) else None, 'completed')}")
+        if "archive_wall_clock" in payload:
+            print(f"  archive wall-clock: {payload['archive_wall_clock']}")
+        for group in payload["autorun_groups"]:
+            print(f"  autorun {group['autorun_id']}: {group['elapsed']}")
+        warnings = sorted(set(list_value(payload.get("warnings")) or [warning for entry in selected for warning in entry.warnings]))
+        if warnings:
+            print("")
+            for warning in warnings:
+                print(f"  warning: {warning}")
+        return 0
+
+    latest_by_feature: dict[str, RunStatsEntry] = {}
+    for entry in entries:
+        latest_by_feature.setdefault(entry.feature, entry)
+    selected_features = sorted(latest_by_feature.values(), key=latest_activity, reverse=True)[:limit]
+    payload = {
+        "features": [run_stats_to_dict(entry) for entry in selected_features],
+        "shown": len(selected_features),
+    }
+    if args.json:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+    print("features:")
+    print("")
+    print("  feature                    latest-run                command      status            elapsed")
+    for entry in selected_features:
+        feature_label = entry.feature if len(entry.feature) <= 26 else entry.feature[:23] + "..."
+        print(
+            f"  {feature_label:<26} {entry.run_id:<25} {entry.command:<12} "
+            f"{entry.status:<17} {format_elapsed(entry.elapsed_seconds, entry.status)}"
+        )
+    print("")
+    print(f"  shown: {len(selected_features)} features")
+    return 0
