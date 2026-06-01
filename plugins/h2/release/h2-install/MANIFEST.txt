@@ -45,9 +45,9 @@ copy_dir  payload/.codex/skills/harness-helm/references/           .codex/skills
 # docs template (`harness new-doc`에서 사용)
 copy_dir  payload/docs/_templates/                                 docs/_templates/
 copy      payload/docs/_archive/.gitkeep                           docs/_archive/.gitkeep
-copy_if_absent payload/docs/_indexes/KB_INDEX.md                   docs/_indexes/KB_INDEX.md
-copy_if_absent payload/docs/_indexes/DOMAIN_INDEX.md               docs/_indexes/DOMAIN_INDEX.md
-copy_if_absent payload/docs/_indexes/TAG_INDEX.md                  docs/_indexes/TAG_INDEX.md
+copy_if_absent payload/docs/_indexes/index_kb.jsonl                docs/_indexes/index_kb.jsonl
+copy_if_absent payload/docs/_indexes/index_domain.jsonl            docs/_indexes/index_domain.jsonl
+copy_if_absent payload/docs/_indexes/index_tag.jsonl               docs/_indexes/index_tag.jsonl
 
 # PDCA 작업 영역: phase folder와 README.md만 포함
 copy      payload/docs/01_plan/README.md                           docs/01_plan/README.md

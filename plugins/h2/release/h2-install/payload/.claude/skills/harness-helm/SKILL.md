@@ -148,7 +148,7 @@ Recommended Markdown shape:
 
 - Select primary/supporting/excluded docs using `0103 Retrieval and Index Policy` and core workflow rules in bundled `references/`.
 - Include applicable canonical docs in `context_pack.canonical_knowledge` so compounded knowledge reinjection is visible.
-- Read `docs/_indexes/KB_INDEX.md` when present; if indexes are absent or stale, inspect canonical source docs directly.
+- Parse `docs/_indexes/index_kb.jsonl`, `index_domain.jsonl`, and `index_tag.jsonl` when present; if indexes are absent or stale, inspect canonical source docs directly.
 - Record index absent/stale freshness warnings in `verification.not_verified`; do not generate indexes.
 - Do not generate `_indexes`.
 - Generate or update the context pack at `.harness-helm/runs/{feature}/{run-id}/context-pack.md` or `.harness-helm/runs/_unscoped/{run-id}/context-pack.md`; downstream `h2-*` commands should start from the same snapshot.

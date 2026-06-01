@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -8,7 +9,7 @@ from typing import Any
 from . import paths
 from .docs import Doc, is_archive, is_excluded, is_index, load_docs
 from .frontmatter import list_value
-from .index import include_in_index
+from .index import INDEX_DOMAIN, INDEX_KB, INDEX_TAG, include_in_index
 from .run_lifecycle import complete_run_manifest, run_id, run_root, start_run_manifest
 from .schema import load_schema
 from .utils import write_text
@@ -67,7 +68,7 @@ RUNTIME_SEED_RULES: list[tuple[set[str], list[str]]] = [
     ),
     (
         {"docs", "kb", "lint", "schema", "frontmatter", "template"},
-        [".harness-helm/h2-schema.yml", "docs/_indexes/KB_INDEX.md"],
+        [".harness-helm/h2-schema.yml"],
     ),
 ]
 
@@ -140,15 +141,85 @@ def canonical_docs(docs: list[Doc], schema: dict[str, Any]) -> list[Doc]:
 def index_freshness(index_paths: list[Path], candidates: list[Doc]) -> tuple[str, str]:
     missing = [path.relative_to(paths.ROOT).as_posix() for path in index_paths if not path.exists()]
     if missing:
-        return "absent", f"index freshness: {', '.join(missing)} 없음; canonical docs direct scan fallback을 사용했다."
+        return "absent", f"index freshness: {', '.join(missing)} 없음; JSONL KB fallback 또는 canonical docs direct scan fallback을 사용했다."
     if not candidates:
-        return "ok", "index freshness: KB_INDEX + DOMAIN_INDEX가 존재하며 freshness 비교 대상 canonical docs가 없다."
+        return "ok", "index freshness: JSONL indexes가 존재하며 freshness 비교 대상 canonical docs가 없다."
 
     oldest_index = min(path.stat().st_mtime for path in index_paths)
     newest_candidate = max(doc.path.stat().st_mtime for doc in candidates)
     if newest_candidate > oldest_index:
-        return "stale", "index freshness: canonical docs가 KB_INDEX + DOMAIN_INDEX보다 최신이다. `.harness-helm/scripts/harness kb-index`를 실행한다."
-    return "ok", "index freshness: KB_INDEX + DOMAIN_INDEX가 존재하며 canonical docs보다 오래되지 않았다."
+        return "stale", "index freshness: canonical docs가 JSONL indexes보다 최신이다. `.harness-helm/scripts/harness kb-index`를 실행한다."
+    return "ok", "index freshness: JSONL indexes가 존재하며 canonical docs보다 오래되지 않았다."
+
+
+def read_jsonl_rows(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            rows.append(value)
+    return rows
+
+
+def load_kb_rows() -> dict[str, dict[str, Any]]:
+    rows: dict[str, dict[str, Any]] = {}
+    for row in read_jsonl_rows(paths.DOCS / "_indexes" / INDEX_KB):
+        if row.get("kind") in {"doc", "avoid"} and isinstance(row.get("path"), str):
+            rows[str(row["path"])] = row
+    return rows
+
+
+def route_candidate_paths(tokens: list[str]) -> set[str]:
+    if not tokens:
+        return set()
+    token_set = set(tokens)
+    selected: set[str] = set()
+    for index_name in (INDEX_DOMAIN, INDEX_TAG):
+        for row in read_jsonl_rows(paths.DOCS / "_indexes" / index_name):
+            if row.get("kind") != "route":
+                continue
+            key = str(row.get("key", "")).lower()
+            if key not in token_set:
+                continue
+            row_paths = row.get("paths", [])
+            if isinstance(row_paths, list):
+                selected.update(str(path) for path in row_paths)
+    return selected
+
+
+def kb_rows_matching_tokens(tokens: list[str], rows: dict[str, dict[str, Any]]) -> set[str]:
+    if not tokens:
+        return set()
+    selected: set[str] = set()
+    for rel, row in rows.items():
+        if row.get("kind") != "doc":
+            continue
+        title = "" if row.get("title") == "[regulated]" else str(row.get("title", ""))
+        haystack = " ".join(
+            [
+                rel.lower(),
+                title.lower(),
+                " ".join(str(item) for item in row.get("tags", []) if isinstance(row.get("tags", []), list)).lower(),
+                " ".join(str(item) for item in row.get("module", []) if isinstance(row.get("module", []), list)).lower(),
+                " ".join(str(item) for item in row.get("domain", []) if isinstance(row.get("domain", []), list)).lower(),
+                str(row.get("type", "")).lower(),
+                str(row.get("status", "")).lower(),
+            ]
+        )
+        if any(token in haystack for token in tokens):
+            selected.add(rel)
+    return selected
+
+
+def docs_by_rel(docs: list[Doc]) -> dict[str, Doc]:
+    return {doc.rel: doc for doc in docs}
 
 
 def docs_matching_canonical_knowledge(
@@ -185,15 +256,19 @@ def docs_matching_canonical_knowledge(
     return [doc for _, doc in scored[:CANONICAL_KNOWLEDGE_LIMIT]]
 
 
-def canonical_selected_by(doc: Doc, freshness_state: str) -> str:
+def canonical_selected_by(doc: Doc, freshness_state: str) -> list[str]:
     tags = ["canonical-knowledge"]
     if doc.rel.startswith("docs/40_knowledge/") or "canonical-promotion" in list_value(doc.frontmatter.get("tags")):
         tags.append("compound-loop")
+    return with_freshness(tags, freshness_state)
+
+
+def with_freshness(tags: list[str], freshness_state: str) -> list[str]:
     if freshness_state == "absent":
         tags.append("index-absent")
     elif freshness_state == "stale":
         tags.append("index-stale")
-    return ", ".join(tags)
+    return tags
 
 
 def runtime_seed_docs(tokens: list[str], existing: set[str]) -> list[str]:
@@ -230,39 +305,54 @@ def command_context(args: argparse.Namespace) -> int:
         )
     feature_docs = docs_matching_feature(args.feature, docs, schema)
     tokens = tokenize_task(args.task)
+    feature_tokens = tokenize_task(args.feature or "")
+    selection_tokens = list(dict.fromkeys(tokens + feature_tokens))
     feature_doc_rels = {doc.rel for doc in feature_docs}
     task_docs = docs_matching_task(tokens, docs, schema, feature_doc_rels)
-    index_docs = [paths.DOCS / "_indexes" / name for name in ("KB_INDEX.md", "DOMAIN_INDEX.md")]
+    index_docs = [paths.DOCS / "_indexes" / name for name in (INDEX_KB, INDEX_DOMAIN, INDEX_TAG)]
     canonical_candidates = canonical_docs(docs, schema)
     freshness_state, freshness_line = index_freshness(index_docs, canonical_candidates)
+    kb_rows = load_kb_rows()
+    docs_lookup = docs_by_rel(docs)
+    structured_rels = route_candidate_paths(selection_tokens)
+    structured_selection_note = "structured index route lookup"
+    if freshness_state != "ok" or not structured_rels:
+        structured_rels = kb_rows_matching_tokens(selection_tokens, kb_rows)
+        structured_selection_note = "structured index KB fallback"
+    structured_docs = [
+        docs_lookup[rel]
+        for rel in sorted(structured_rels)
+        if rel in docs_lookup and not is_archive(docs_lookup[rel]) and not is_index(docs_lookup[rel]) and not is_excluded(docs_lookup[rel], schema)
+    ]
     canonical_entries = [
         (doc.rel, canonical_selected_by(doc, freshness_state))
         for doc in docs_matching_canonical_knowledge(tokens, args.feature, docs, schema)
     ]
 
-    primary_entries: list[tuple[str, str]] = []
-    for path in index_docs:
-        if path.exists():
-            primary_entries.append((path.relative_to(paths.ROOT).as_posix(), "index"))
-    for doc in feature_docs[:8]:
-        primary_entries.append((doc.rel, "feature-match"))
+    primary_entries: list[tuple[str, list[str]]] = []
+    for doc in structured_docs[:8]:
+        primary_entries.append((doc.rel, with_freshness(["structured-index", "task-token"], freshness_state)))
     primary_rels = {rel for rel, _ in primary_entries}
+    for doc in feature_docs[:8]:
+        if doc.rel not in primary_rels:
+            primary_entries.append((doc.rel, with_freshness(["feature-match"], freshness_state)))
+            primary_rels.add(doc.rel)
     for doc in task_docs[:6]:
         if doc.rel not in primary_rels:
-            primary_entries.append((doc.rel, "task-token"))
+            primary_entries.append((doc.rel, with_freshness(["task-token"], freshness_state)))
             primary_rels.add(doc.rel)
     for rel in runtime_seed_docs(tokens, primary_rels):
-        primary_entries.append((rel, "runtime-seed"))
+        primary_entries.append((rel, ["runtime-seed"]))
         primary_rels.add(rel)
 
-    supporting_entries: list[tuple[str, str]] = []
+    supporting_entries: list[tuple[str, list[str]]] = []
     for doc in feature_docs[8:16]:
         if doc.rel not in primary_rels:
-            supporting_entries.append((doc.rel, "feature-match"))
+            supporting_entries.append((doc.rel, with_freshness(["feature-match"], freshness_state)))
     for doc in task_docs[6:14]:
         rels = primary_rels | {rel for rel, _ in supporting_entries}
         if doc.rel not in rels:
-            supporting_entries.append((doc.rel, "task-token"))
+            supporting_entries.append((doc.rel, with_freshness(["task-token"], freshness_state)))
 
     excluded = [
         "docs/_archive/** body",
@@ -271,6 +361,10 @@ def command_context(args: argparse.Namespace) -> int:
         "draft/pending documents unless task-scoped",
         "regulated documents unless explicitly task-scoped",
     ]
+    def render_entry(entry: tuple[str, list[str]]) -> str:
+        rel, selected_by = entry
+        return f"- {rel} (selected_by: {', '.join(selected_by)})"
+
     lines = [
         "---",
         "command: h2-context",
@@ -287,17 +381,17 @@ def command_context(args: argparse.Namespace) -> int:
         "### primary_docs",
     ]
     if primary_entries:
-        lines.extend(f"- {rel} (selected_by: {tag})" for rel, tag in primary_entries)
+        lines.extend(render_entry(entry) for entry in primary_entries)
     else:
         lines.append("- 없음")
     lines.extend(["", "### supporting_docs"])
     if supporting_entries:
-        lines.extend(f"- {rel} (selected_by: {tag})" for rel, tag in supporting_entries)
+        lines.extend(render_entry(entry) for entry in supporting_entries)
     else:
         lines.append("- 없음")
     lines.extend(["", "### canonical_knowledge"])
     if canonical_entries:
-        lines.extend(f"- {rel} (selected_by: {tag})" for rel, tag in canonical_entries)
+        lines.extend(render_entry(entry) for entry in canonical_entries)
     else:
         lines.append("- 없음")
     lines.extend(["", "### excluded_by_policy"])
@@ -307,8 +401,9 @@ def command_context(args: argparse.Namespace) -> int:
             "",
             "### assumptions",
             "- `_indexes`는 routing hint이며 원본 문서가 canonical reference다.",
-            "- index가 stale 또는 absent이면 canonical docs를 직접 검사하고 `index-absent` 또는 `index-stale`로 표시한다.",
-            "- `selected_by`는 문서 선택 출처를 표시한다: index | feature-match | task-token | runtime-seed | canonical-knowledge | compound-loop | index-absent | index-stale.",
+            f"- h2-context는 JSONL index를 `{structured_selection_note}` 방식으로 파싱하고, index 파일 자체를 primary_docs에 싣지 않는다.",
+            "- index가 stale 또는 absent이면 JSONL KB fallback 또는 canonical docs direct scan을 사용하고 `index-absent` 또는 `index-stale`로 표시한다.",
+            "- `selected_by`는 문서 선택 출처를 표시한다: structured-index | feature-match | task-token | runtime-seed | canonical-knowledge | compound-loop | index-absent | index-stale.",
             "",
             "## Artifacts",
             "",

@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 
 from . import paths
 from .docs import Doc, is_archive, is_draft, is_excluded, is_index, is_pending, load_docs
 from .frontmatter import list_value
 from .schema import load_schema
 from .utils import now_kst, print_report, write_text
+
+
+INDEX_KB = "index_kb.jsonl"
+INDEX_DOMAIN = "index_domain.jsonl"
+INDEX_TAG = "index_tag.jsonl"
+LEGACY_INDEXES = ("KB_INDEX.md", "DOMAIN_INDEX.md", "TAG_INDEX.md")
 
 
 def include_in_index(doc: Doc, schema: dict | None = None) -> bool:
@@ -20,13 +27,93 @@ def include_in_index(doc: Doc, schema: dict | None = None) -> bool:
     return True
 
 
-def minimal_line(doc: Doc) -> str:
-    security = doc.frontmatter.get("security", "unknown")
-    status = doc.frontmatter.get("status", "unknown")
-    dtype = doc.frontmatter.get("type", "unknown")
-    if security in {"regulated", "confidential"}:
-        return f"- [{doc.title}]({paths.rel_link('../' + doc.rel.removeprefix('docs/'))}) — `{dtype}`, `{status}`, `{security}`"
-    return f"- [{doc.title}]({paths.rel_link('../' + doc.rel.removeprefix('docs/'))}) — `{dtype}`, `{status}`"
+def jsonl_line(row: dict) -> str:
+    return json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def jsonl_meta(index_name: str) -> dict:
+    return {
+        "kind": "meta",
+        "schema_version": 1,
+        "index": index_name,
+        "generated_by": "harness kb-index",
+        "source": "docs",
+        "do_not_edit": True,
+    }
+
+
+def sorted_values(value: object) -> list[str]:
+    return sorted({item for item in list_value(value) if item})
+
+
+def doc_row(doc: Doc) -> dict:
+    security = str(doc.frontmatter.get("security", "internal"))
+    title = doc.title
+    tags = sorted_values(doc.frontmatter.get("tags"))
+    domains = sorted_values(doc.frontmatter.get("domain"))
+    modules = sorted_values(doc.frontmatter.get("module"))
+    if security == "regulated":
+        title = "[regulated]"
+        tags = []
+        domains = []
+        modules = []
+    row = {
+        "kind": "doc",
+        "title": title,
+        "path": doc.rel,
+        "type": str(doc.frontmatter.get("type", "unknown")),
+        "status": str(doc.frontmatter.get("status", "unknown")),
+        "security": security,
+        "tags": tags,
+        "domain": domains,
+        "module": modules,
+    }
+    related = sorted_values(doc.frontmatter.get("related"))
+    if related:
+        row["related"] = related
+    source_trace = doc.frontmatter.get("source_trace") or doc.frontmatter.get("source_pr")
+    if source_trace:
+        row["source_trace"] = str(source_trace)
+    return row
+
+
+def avoid_row(doc: Doc) -> dict:
+    row = {
+        "kind": "avoid",
+        "path": doc.rel,
+        "avoid": sorted_values(doc.frontmatter.get("ai_avoid_phrases")) or ["see document"],
+        "reason": "rejected decision",
+    }
+    use_instead = sorted_values(doc.frontmatter.get("use_instead"))
+    if use_instead:
+        row["use_instead"] = use_instead
+    revisit_trigger = doc.frontmatter.get("revisit_trigger")
+    if revisit_trigger:
+        row["revisit_trigger"] = str(revisit_trigger)
+    return row
+
+
+def write_jsonl(path, rows: list[dict]) -> None:
+    write_text(path, "\n".join(jsonl_line(row) for row in rows) + "\n")
+
+
+def add_route(route_map: dict[tuple[str, str], set[str]], route_type: str, key: str, path: str) -> None:
+    if key:
+        route_map.setdefault((route_type, key), set()).add(path)
+
+
+def route_rows(index_name: str, route_map: dict[tuple[str, str], set[str]]) -> list[dict]:
+    rows = [jsonl_meta(index_name)]
+    for route_type, key in sorted(route_map):
+        rows.append(
+            {
+                "kind": "route",
+                "route_type": route_type,
+                "key": key,
+                "paths": sorted(route_map[(route_type, key)]),
+            }
+        )
+    return rows
 
 
 def command_index(args: argparse.Namespace) -> int:
@@ -38,48 +125,41 @@ def command_index(args: argparse.Namespace) -> int:
     rejected = [
         doc for doc in docs if doc.rel.startswith("docs/30_decisions/") and doc.path.name.endswith(".rejected.md")
     ]
-    generated_header = schema["generated_header"]
-    kb = [generated_header, "", "# KB Index", ""]
-    for doc in indexed:
-        kb.append(minimal_line(doc))
-    if rejected:
-        kb.extend(["", "## Do Not Use", ""])
-        for doc in rejected:
-            phrases = ", ".join(list_value(doc.frontmatter.get("ai_avoid_phrases"))) or "see document"
-            kb.append(f"- [{doc.title}]({paths.rel_link('../' + doc.rel.removeprefix('docs/'))}) — avoid: {phrases}")
-    write_text(target / "KB_INDEX.md", "\n".join(kb) + "\n")
 
+    kb_rows = [jsonl_meta("kb")]
+    kb_rows.extend(doc_row(doc) for doc in indexed)
+    kb_rows.extend(avoid_row(doc) for doc in rejected)
+    write_jsonl(target / INDEX_KB, kb_rows)
+
+    domain_route_map: dict[tuple[str, str], set[str]] = {}
+    tag_route_map: dict[tuple[str, str], set[str]] = {}
     domains = schema["domains"]
-    domain_lines = [generated_header, "", "# Domain Index", ""]
-    for domain in sorted(domains):
-        items = [
-            doc
-            for doc in indexed
-            if f"docs/10_domain/{domain}/" in doc.rel
-            or domain in list_value(doc.frontmatter.get("tags"))
-            or domain in list_value(doc.frontmatter.get("module"))
-            or domain in list_value(doc.frontmatter.get("domain"))
-        ]
-        if items:
-            domain_lines.extend([f"## {domain}", ""])
-            domain_lines.extend(minimal_line(doc) for doc in items)
-            domain_lines.append("")
-    write_text(target / "DOMAIN_INDEX.md", "\n".join(domain_lines).rstrip() + "\n")
-
-    tag_map: dict[str, list[Doc]] = {}
     for doc in indexed:
-        for tag in list_value(doc.frontmatter.get("tags")):
-            tag_map.setdefault(tag, []).append(doc)
-    tag_lines = [generated_header, "", "# Tag Index", ""]
-    for tag in sorted(tag_map):
-        tag_lines.extend([f"## {tag}", ""])
-        tag_lines.extend(minimal_line(doc) for doc in tag_map[tag])
-        tag_lines.append("")
-    write_text(target / "TAG_INDEX.md", "\n".join(tag_lines).rstrip() + "\n")
+        for domain in sorted(domains):
+            if (
+                f"docs/10_domain/{domain}/" in doc.rel
+                or domain in list_value(doc.frontmatter.get("tags"))
+                or domain in list_value(doc.frontmatter.get("domain"))
+            ):
+                add_route(domain_route_map, "domain", domain, doc.rel)
+        for module in sorted_values(doc.frontmatter.get("module")):
+            add_route(domain_route_map, "module", module, doc.rel)
+        for tag in sorted_values(doc.frontmatter.get("tags")):
+            add_route(tag_route_map, "tag", tag, doc.rel)
 
-    print(f"kb-index: wrote {target / 'KB_INDEX.md'}")
-    print(f"kb-index: wrote {target / 'DOMAIN_INDEX.md'}")
-    print(f"kb-index: wrote {target / 'TAG_INDEX.md'}")
+    write_jsonl(target / INDEX_DOMAIN, route_rows("domain", domain_route_map))
+    write_jsonl(target / INDEX_TAG, route_rows("tag", tag_route_map))
+
+    for name in LEGACY_INDEXES:
+        legacy = target / name
+        if legacy.exists():
+            legacy.unlink()
+
+    print(f"kb-index: wrote {target / INDEX_KB}")
+    print(f"kb-index: wrote {target / INDEX_DOMAIN}")
+    print(f"kb-index: wrote {target / INDEX_TAG}")
+    for name in LEGACY_INDEXES:
+        print(f"kb-index: removed legacy {target / name}")
     return 0
 
 

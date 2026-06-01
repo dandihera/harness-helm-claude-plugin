@@ -149,7 +149,7 @@ Recommended Markdown shape:
 
 - bundled `references/`의 `0103 Retrieval and Index Policy`와 core workflow rule을 사용해 primary/supporting/excluded docs를 선택한다.
 - 적용 가능한 canonical docs를 `context_pack.canonical_knowledge`에 포함해 compounded knowledge 재투입을 보이게 한다.
-- `docs/_indexes/KB_INDEX.md`가 있으면 읽는다. index가 없거나 stale이면 공식 기준 문서를 직접 확인한다.
+- `docs/_indexes/index_kb.jsonl`, `index_domain.jsonl`, `index_tag.jsonl`이 있으면 파싱한다. index가 없거나 stale이면 공식 기준 문서를 직접 확인한다.
 - index absent/stale freshness warning은 `verification.not_verified`에 기록한다. index는 생성하지 않는다.
 - `_indexes`를 생성하지 않는다.
 - context pack을 `.harness-helm/runs/{feature}/{run-id}/context-pack.md` 또는 `.harness-helm/runs/_unscoped/{run-id}/context-pack.md`에 생성하거나 갱신한다. 후속 `h2-*` command는 같은 snapshot을 기준으로 시작한다.
