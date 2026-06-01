@@ -19,7 +19,7 @@ This file defines command meaning and routing. It does not choose upstream provi
 - `h2-review`: record review findings and route to `docs/03_review/{type}/{feature}.md`.
 - `h2-report`: summarize lifecycle results and route to `docs/04_report/{feature}.md`.
 - `h2-compound`: compound reusable knowledge and stage governed canonical promotion candidates.
-- `h2-archive`: check for h2-compound run evidence as preflight (auto-trigger if absent); then plan archive movement for completed 01-04 workflow artifacts; actual movement and completed feature run-root cleanup are delegated to archive tooling.
+- `h2-archive`: check for h2-compound run evidence as preflight (auto-trigger if absent); then execute archive movement for completed 01-04 workflow artifacts and the completed feature run-root through archive tooling. Use dry-run only when the user explicitly asks for preview-only behavior.
 - `h2-ops`: record operational follow-up candidates.
 - `h2-cartridge`: inspect or update cartridge mappings.
 

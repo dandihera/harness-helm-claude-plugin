@@ -180,6 +180,7 @@ Recommended Markdown shape:
 - 하위 단계가 `status: blocked`를 반환하면 즉시 중단한다.
 - `verification.not_verified`는 warning으로 요약한다. 단, 사람 review evidence 누락은 summary에서 강조한다.
 - `h2-report`가 `h2-archive`를 추천하는 경우는 일반 next-step mismatch보다 먼저 평가한다. 그래도 `h2-archive` 전 `h2-compound`를 명시적으로 실행한다.
+- `h2-autorun`이 `h2-archive`에 도달하면 기본적으로 실제 archive를 실행한다. 사용자가 dry-run, preview-only, no archive를 명시적으로 요청하지 않은 한 archive를 `--dry-run`으로 낮추지 않는다.
 - `.harness-helm/runs/{feature}/{run-id}/autorun-summary.md`로 route한다.
 - `next.recommended_h2_step`을 `null`로 설정한다.
 
@@ -247,6 +248,7 @@ Recommended Markdown shape:
 
 - `.harness-helm/runs/{feature}/*/compound-candidates.md`를 확인해 이 feature에 대해 `h2-compound`가 실행됐는지 검사한다. compound 실행 증거가 없으면 archive 진행 전에 `h2-compound` 의미를 자동으로 preflight 실행한다.
 - `.harness-helm/scripts/harness archive {feature}`를 실행해 archive를 수행한다. 변경 사항을 적용하지 않고 미리보기만 하려면 `--dry-run`을 사용한다.
+- `h2-autorun` 안의 `h2-archive`는 preview 단계가 아니라 execute 단계다. 사용자가 lifecycle 자동 진행을 이미 요청했으므로 기본값은 non-dry-run archive다.
 - archive file movement를 재구현하지 않는다.
 - archive 완료 후 `.harness-helm/scripts/harness kb-index`를 실행해 `docs/_indexes/*.md`에 새 archive manifest 항목이 반영되도록 한다. 재생성된 index 파일을 archive와 같은 commit/PR에 포함한다. 누락하면 다음 push에서 `harness-validate`(또는 동등한 CI)가 index drift로 실패한다.
 - `.harness-helm/runs/{feature}/{run-id}/archive-plan.md`로 route한다.

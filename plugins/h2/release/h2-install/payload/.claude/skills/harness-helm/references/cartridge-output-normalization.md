@@ -40,6 +40,6 @@ Creating `raw/`, `normalized/`, and `promotion-candidates/` folders is the respo
 - `h2-build`, `h2-test`, `h2-review`: normalize actor results to run artifacts or review docs. Do not replace actual execution evidence with upstream suggestions.
 - `h2-report`: normalize lifecycle summary and follow-up needs to `docs/04_report/{feature}.md`.
 - `h2-compound`: map low-risk learning/solution writes to `artifacts.created` or `artifacts.updated`; keep governed canonical targets in `routing.promotion_candidates` until approval.
-- `h2-archive`, `h2-ops`, `h2-cartridge`: normalize dry-run, ops, and mapping validation output to configured routes.
+- `h2-archive`, `h2-ops`, `h2-cartridge`: normalize archive execution or explicit dry-run preview, ops, and mapping validation output to configured routes.
 
 Raw output must mask sensitive information and follow the core workflow staging cleanup policy.

@@ -1,7 +1,7 @@
 # harness-helm 설치 manifest
 # 규칙: 이 파일에 작성하는 주석은 한글로 기입한다.
 # 형식: <kind> <source> <destination>
-#   kind:        copy | copy_dir | managed
+#   kind:        copy | copy_dir | copy_if_absent | managed
 #   source:      h2-install/ 기준 상대 경로(이 manifest가 있는 디렉터리)
 #   destination: --target root 기준 상대 경로
 # 참고:
@@ -44,9 +44,9 @@ copy_dir  payload/.codex/skills/harness-helm/references/           .codex/skills
 # docs template (`harness new-doc`에서 사용)
 copy_dir  payload/docs/_templates/                                 docs/_templates/
 copy      payload/docs/_archive/.gitkeep                           docs/_archive/.gitkeep
-copy      payload/docs/_indexes/KB_INDEX.md                        docs/_indexes/KB_INDEX.md
-copy      payload/docs/_indexes/DOMAIN_INDEX.md                    docs/_indexes/DOMAIN_INDEX.md
-copy      payload/docs/_indexes/TAG_INDEX.md                       docs/_indexes/TAG_INDEX.md
+copy_if_absent payload/docs/_indexes/KB_INDEX.md                   docs/_indexes/KB_INDEX.md
+copy_if_absent payload/docs/_indexes/DOMAIN_INDEX.md               docs/_indexes/DOMAIN_INDEX.md
+copy_if_absent payload/docs/_indexes/TAG_INDEX.md                  docs/_indexes/TAG_INDEX.md
 
 # PDCA 작업 영역: phase folder와 README.md만 포함
 copy      payload/docs/01_plan/README.md                           docs/01_plan/README.md

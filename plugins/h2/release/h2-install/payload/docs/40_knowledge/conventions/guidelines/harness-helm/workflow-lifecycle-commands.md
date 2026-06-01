@@ -30,7 +30,7 @@ tags:
 h2-context -> h2-plan -> h2-design -> h2-analysis -> h2-build -> h2-test -> h2-review -> h2-report -> h2-compound -> h2-archive
 ```
 
-`h2-autorun`은 위 흐름 중 analysis부터 archive까지를 이어서 실행하는 orchestration command다. 각 child step 전에 rewind 가능한 snapshot을 남겨야 한다.
+`h2-autorun`은 위 흐름 중 analysis부터 archive까지를 이어서 실행하는 orchestration command다. 각 child step 전에 rewind 가능한 snapshot을 남겨야 한다. 사용자가 `h2-autorun`을 요청한 경우 archive까지 자동 진행한다는 판단이 포함된 것으로 보고, `h2-archive`는 기본적으로 실제 archive를 실행한다. dry-run은 사용자가 preview-only 동작을 명시적으로 요청할 때만 사용한다.
 
 ## 공통 출력
 
@@ -56,4 +56,3 @@ h2-context -> h2-plan -> h2-design -> h2-analysis -> h2-build -> h2-test -> h2-r
 - provider가 달라졌다는 이유로 command routing을 바꾸지 않는다.
 - upstream raw output을 h2 공식 artifact로 그대로 저장하지 않는다.
 - review 또는 approval이 필요한 canonical 변경을 lifecycle command가 자동 승격하지 않는다.
-

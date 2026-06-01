@@ -40,6 +40,6 @@ upstream raw output
 - `h2-build`, `h2-test`, `h2-review`: actor result를 run artifact 또는 review docs로 정규화합니다. Actual execution evidence를 upstream suggestion으로 대체하지 않습니다.
 - `h2-report`: lifecycle summary와 follow-up need를 `docs/04_report/{feature}.md`로 정규화합니다.
 - `h2-compound`: low-risk learning/solution 작성은 `artifacts.created` 또는 `artifacts.updated`로 매핑하고, governed canonical 대상은 승인 전까지 `routing.promotion_candidates`에 유지합니다.
-- `h2-archive`, `h2-ops`, `h2-cartridge`: dry-run, ops, mapping validation output을 configured route로 정규화합니다.
+- `h2-archive`, `h2-ops`, `h2-cartridge`: archive 실행 또는 명시적 dry-run preview, ops, mapping validation output을 configured route로 정규화합니다.
 
 Raw output은 sensitive information을 masking하고 core workflow staging cleanup policy를 따라야 합니다.

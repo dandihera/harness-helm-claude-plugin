@@ -214,6 +214,7 @@ Recommended Markdown shape:
 - Stop immediately when a child step returns `status: blocked`.
 - Treat `verification.not_verified` as a warning and summarize it, except that missing human review evidence must be highlighted in the summary.
 - Evaluate the `h2-report` recommendation of `h2-archive` as a special case before generic next-step mismatch; still run `h2-compound` explicitly before `h2-archive`.
+- When `h2-autorun` reaches `h2-archive`, execute the real archive by default. Do not downgrade archive to `--dry-run` unless the user explicitly requested dry-run, preview-only, or no archive.
 - Route to `.harness-helm/runs/{feature}/{run-id}/autorun-summary.md`.
 - Set `next.recommended_h2_step` to `null`.
 
@@ -281,6 +282,7 @@ Recommended Markdown shape:
 
 - Check whether `h2-compound` has run for this feature by looking for `.harness-helm/runs/{feature}/*/compound-candidates.md`. If no compound evidence exists, run `h2-compound` meaning automatically as preflight before proceeding.
 - Run `.harness-helm/scripts/harness archive {feature}` to execute the archive. Use `--dry-run` to preview changes without applying them.
+- In `h2-autorun`, `h2-archive` is an execute step, not a preview step. Use non-dry-run archive by default because the user has already requested automatic progression through the lifecycle.
 - Do not reimplement archive file movement.
 - `harness archive` moves `.harness-helm/runs/{feature}/` to `docs/_archive/{archive-folder}/runs/` rather than deleting it; run artifacts are preserved alongside archived phase docs.
 - After archive completes, run `.harness-helm/scripts/harness kb-index` to refresh `docs/_indexes/*.md` so the new archive manifest entry is registered. Include the regenerated index files in the same archive commit/PR; otherwise `harness-validate` (or equivalent CI) flags an index drift on the next push.
