@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import re
 import shutil
 from pathlib import Path
 
 from . import paths
 from .frontmatter import parse_frontmatter, render_frontmatter
-from .run_lifecycle import RUNTIME_SUMMARY_NAME, write_runtime_summary
+from .run_lifecycle import stage_runtime_summary_json_path, stage_runtime_summary_md_path, write_runtime_summary
 from .utils import now_kst, read_text, write_text
 
 
@@ -72,6 +73,33 @@ def cleanup_archived_run(feature: str, dry_run: bool, dest_root: Path | None = N
         print(f"  {'would remove' if dry_run else 'remove'} {run_path.relative_to(paths.ROOT)}")
         if not dry_run:
             shutil.rmtree(run_path)
+
+
+def complete_archived_archive_snapshots(dest_root: Path, completed_at: dt.datetime) -> None:
+    for manifest_path in sorted((dest_root / "runs").glob("*/snapshots/h2-archive/manifest.json")):
+        try:
+            manifest = json.loads(read_text(manifest_path))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(manifest, dict):
+            continue
+        if manifest.get("status") == "completed" and manifest.get("completed_at"):
+            continue
+        manifest["command"] = manifest.get("command") or "h2-archive"
+        manifest["status"] = "completed"
+        manifest["started_at"] = manifest.get("started_at") or manifest.get("created_at") or completed_at.isoformat()
+        manifest["completed_at"] = completed_at.isoformat()
+        manifest["autorun_id"] = manifest.get("autorun_id") or manifest.get("run_id")
+        artifacts = manifest.get("artifact_paths") if isinstance(manifest.get("artifact_paths"), list) else []
+        for artifact in [
+            paths.repository_rel(dest_root / "manifest.md"),
+            paths.repository_rel(stage_runtime_summary_json_path(dest_root)),
+            paths.repository_rel(stage_runtime_summary_md_path(dest_root)),
+        ]:
+            if artifact not in artifacts:
+                artifacts.append(artifact)
+        manifest["artifact_paths"] = artifacts
+        write_text(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
 
 
 def command_cleanup_runs(args: argparse.Namespace) -> int:
@@ -156,7 +184,8 @@ def command_archive(args: argparse.Namespace) -> int:
     manifest_path = dest_root / "manifest.md"
     if args.dry_run:
         print(f"  would write manifest {manifest_path.relative_to(paths.ROOT)}")
-        print(f"  would write runtime summary {(dest_root / RUNTIME_SUMMARY_NAME).relative_to(paths.ROOT)}")
+        print(f"  would write stage runtime summary {stage_runtime_summary_json_path(dest_root).relative_to(paths.ROOT)}")
+        print(f"  would write stage runtime summary markdown {stage_runtime_summary_md_path(dest_root).relative_to(paths.ROOT)}")
         cleanup_archived_run(feature, dry_run=True, dest_root=dest_root)
     if not args.dry_run:
         lines = ["---"]
@@ -172,5 +201,6 @@ def command_archive(args: argparse.Namespace) -> int:
         lines.extend(["---", "", f"# Archive Manifest: {feature}", "", "Archive manifest metadata only. Do not include detailed implementation content here.", ""])
         write_text(manifest_path, "\n".join(lines))
         cleanup_archived_run(feature, dry_run=False, dest_root=dest_root)
+        complete_archived_archive_snapshots(dest_root, completed_at=now)
         write_runtime_summary(dest_root, generated_at=now)
     return 0

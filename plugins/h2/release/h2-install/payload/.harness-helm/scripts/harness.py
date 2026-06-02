@@ -59,6 +59,7 @@ class HarnessArgumentParser(argparse.ArgumentParser):
 
 
 from harness_lib.run_lifecycle import (
+    INVOCATION_MODES,
     command_run_mark,
     command_run_stats,
 )
@@ -106,12 +107,16 @@ def build_parser() -> argparse.ArgumentParser:
     run_mark_start.add_argument("--command", dest="h2_command", required=True, choices=sorted(EXPECTED_COMMANDS))
     run_mark_start.add_argument("--task")
     run_mark_start.add_argument("--autorun-id")
+    run_mark_start.add_argument("--invoked-surface")
+    run_mark_start.add_argument("--invocation-mode", choices=sorted(INVOCATION_MODES))
     run_mark_start.set_defaults(func=command_run_mark)
     run_mark_complete = run_mark_sub.add_parser("complete")
     run_mark_complete.add_argument("--feature", required=True)
     run_mark_complete.add_argument("--run-id", required=True)
     run_mark_complete.add_argument("--status", choices=["completed", "failed", "incomplete"], default="completed")
     run_mark_complete.add_argument("--artifact", action="append")
+    run_mark_complete.add_argument("--invoked-surface")
+    run_mark_complete.add_argument("--invocation-mode", choices=sorted(INVOCATION_MODES))
     run_mark_complete.set_defaults(func=command_run_mark)
 
     run_stats = sub.add_parser("run-stats")
@@ -126,11 +131,22 @@ def build_parser() -> argparse.ArgumentParser:
     snapshot_save.add_argument("--feature", required=True)
     snapshot_save.add_argument("--run-id", required=True)
     snapshot_save.add_argument("--step", required=True, choices=sorted(REWINDABLE_STEPS))
+    snapshot_save.add_argument("--invoked-surface")
+    snapshot_save.add_argument("--invocation-mode", choices=sorted(INVOCATION_MODES))
     snapshot_save.set_defaults(func=command_snapshot)
     snapshot_list = snapshot_sub.add_parser("list")
     snapshot_list.add_argument("--feature", required=True)
     snapshot_list.add_argument("--run-id")
     snapshot_list.set_defaults(func=command_snapshot)
+    snapshot_complete = snapshot_sub.add_parser("complete")
+    snapshot_complete.add_argument("--feature", required=True)
+    snapshot_complete.add_argument("--run-id", required=True)
+    snapshot_complete.add_argument("--step", required=True, choices=sorted(REWINDABLE_STEPS))
+    snapshot_complete.add_argument("--status", choices=["completed", "failed", "incomplete"], default="completed")
+    snapshot_complete.add_argument("--artifact", action="append")
+    snapshot_complete.add_argument("--invoked-surface")
+    snapshot_complete.add_argument("--invocation-mode", choices=sorted(INVOCATION_MODES))
+    snapshot_complete.set_defaults(func=command_snapshot)
     snapshot_restore = snapshot_sub.add_parser("restore")
     snapshot_restore.add_argument("--feature", required=True)
     snapshot_restore.add_argument("--run-id", required=True)

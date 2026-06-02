@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from . import paths
-from .run_lifecycle import run_root
+from .run_lifecycle import normalize_invocation_mode, normalize_invoked_surface, run_root
 from .utils import now_kst, read_text, write_text
 
 
@@ -142,18 +142,64 @@ def command_snapshot_save(args: argparse.Namespace) -> int:
             )
         files.append(entry)
 
+    created_at = now_kst().isoformat()
     manifest = {
         "schema_version": 1,
         "feature": args.feature,
         "run_id": args.run_id,
         "step": args.step,
-        "created_at": now_kst().isoformat(),
+        "created_at": created_at,
         "kind": "pre-step-snapshot",
+        "command": args.step,
+        "status": "running",
+        "started_at": created_at,
+        "completed_at": None,
+        "autorun_id": args.run_id,
+        "artifact_paths": [],
         "files": files,
         "archive_residue_policy": "preserve-and-warn",
     }
+    invoked_surface = normalize_invoked_surface(getattr(args, "invoked_surface", None))
+    if invoked_surface is not None:
+        manifest["invoked_surface"] = invoked_surface
+    invocation_mode = getattr(args, "invocation_mode", None)
+    if invocation_mode is not None:
+        manifest["invocation_mode"] = normalize_invocation_mode(invocation_mode)
     write_text(root / "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
     print(f"h2-snapshot save: wrote {paths.repository_rel(root / 'manifest.json')}")
+    return 0
+
+
+def command_snapshot_complete(args: argparse.Namespace) -> int:
+    try:
+        manifest_path = snapshot_manifest_path(args.feature, args.run_id, args.step)
+        manifest = load_snapshot_manifest(manifest_path)
+        if manifest.get("feature") != args.feature or manifest.get("run_id") != args.run_id or manifest.get("step") != args.step:
+            raise ValueError("snapshot manifest does not match requested feature/run-id/step.")
+        if args.status not in {"completed", "failed", "incomplete"}:
+            raise ValueError("status must be completed, failed, or incomplete.")
+    except (FileNotFoundError, ValueError, json.JSONDecodeError) as error:
+        print(f"h2-snapshot complete: {error}")
+        return 1
+
+    artifacts = manifest.get("artifact_paths") if isinstance(manifest.get("artifact_paths"), list) else []
+    for artifact in args.artifact or []:
+        if artifact not in artifacts:
+            artifacts.append(artifact)
+    manifest["command"] = manifest.get("command") or args.step
+    manifest["status"] = args.status
+    manifest["started_at"] = manifest.get("started_at") or manifest.get("created_at") or now_kst().isoformat()
+    manifest["completed_at"] = None if args.status == "incomplete" else now_kst().isoformat()
+    manifest["autorun_id"] = manifest.get("autorun_id") or args.run_id
+    manifest["artifact_paths"] = artifacts
+    invoked_surface = normalize_invoked_surface(getattr(args, "invoked_surface", None))
+    if invoked_surface is not None:
+        manifest["invoked_surface"] = invoked_surface
+    invocation_mode = getattr(args, "invocation_mode", None)
+    if invocation_mode is not None:
+        manifest["invocation_mode"] = normalize_invocation_mode(invocation_mode)
+    write_text(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+    print(f"h2-snapshot complete: wrote {paths.repository_rel(manifest_path)}")
     return 0
 
 
@@ -286,9 +332,11 @@ def command_snapshot(args: argparse.Namespace) -> int:
         return command_snapshot_save(args)
     if args.snapshot_action == "list":
         return command_snapshot_list(args)
+    if args.snapshot_action == "complete":
+        return command_snapshot_complete(args)
     if args.snapshot_action == "restore":
         return command_snapshot_restore(args)
-    print("h2-snapshot: expected save, list, or restore.")
+    print("h2-snapshot: expected save, list, complete, or restore.")
     return 1
 
 
