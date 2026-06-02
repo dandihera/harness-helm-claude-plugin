@@ -20,6 +20,7 @@ INSTALL_MARKER_VERSION = "v1"
 INSTALL_MANIFEST_KINDS = {"copy", "copy_dir", "copy_if_absent", "managed"}
 INSTALL_MARKER_BEGIN_RE = re.compile(r"<!--\s*harness-helm:managed:begin\s+(v\d+)\s*-->")
 INSTALL_MARKER_END_RE = re.compile(r"<!--\s*harness-helm:managed:end\s+(v\d+)\s*-->")
+INSTALL_VERSION_RE = re.compile(r"^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 
 
 @dataclasses.dataclass
@@ -181,6 +182,25 @@ def iter_copy_dir_files(src: Path) -> list[Path]:
     )
 
 
+def _install_marker_version(path: Path) -> tuple[int, int, int] | None:
+    version = path.stem.replace("h2-install-", "", 1)
+    match = INSTALL_VERSION_RE.match(version)
+    if not match:
+        return None
+    return tuple(int(part) for part in match.groups())
+
+
+def resolve_package_version(package_root: Path) -> str:
+    version_files = []
+    for path in package_root.glob("h2-install-v*.txt"):
+        parsed = _install_marker_version(path)
+        if parsed is not None:
+            version_files.append((parsed, path))
+    if not version_files:
+        return "unknown"
+    return max(version_files, key=lambda item: item[0])[1].stem.replace("h2-install-", "", 1)
+
+
 def command_install(args: argparse.Namespace) -> int:
     target = Path(args.target).resolve()
     if not (target / ".git").exists() and not args.allow_non_git:
@@ -198,8 +218,7 @@ def command_install(args: argparse.Namespace) -> int:
         return 1
     package_root = manifest_path.parent
 
-    version_files = sorted(package_root.glob("h2-install-v*.txt"))
-    package_version = version_files[0].stem.replace("h2-install-", "") if version_files else "unknown"
+    package_version = resolve_package_version(package_root)
 
     rules, parse_errors = parse_install_manifest(read_text(manifest_path))
     if parse_errors:
