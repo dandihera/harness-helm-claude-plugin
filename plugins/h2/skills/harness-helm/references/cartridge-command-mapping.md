@@ -6,11 +6,11 @@ Compact runtime snapshot of h2 invocation recording, fallback handling, and rout
 
 ## Rule
 
-`.harness-helm/h2-cartridge.yml` is the source of truth for installed provider, surface, fallback label, routing target, alternatives, and external tool registry values.
+`.harness-helm/h2-cartridge.yml` is the source of truth for installed provider, surface, fallback label, routing target, output language, alternatives, and external tool registry values.
 
 If the cartridge file is absent in a target project, use this reference for invocation recording, fallback handling, and routing invariants only. Record that the cartridge file was not available.
 
-Read `.harness-helm/h2-cartridge.yml` directly to inspect installed provider, surface, fallback label, routing target, alternatives, and external tool registry values.
+Read `.harness-helm/h2-cartridge.yml` directly to inspect installed provider, surface, fallback label, routing target, output language, alternatives, and external tool registry values.
 
 ## Invocation Recording
 

@@ -11,7 +11,7 @@
 ## Runtime Roots
 
 - `.harness-helm/h2-schema.yml`: docs frontmatter와 validation 설정
-- `.harness-helm/h2-cartridge.yml`: provider, surface, fallback, routing mapping
+- `.harness-helm/h2-cartridge.yml`: provider, surface, fallback, routing, output language mapping
 - `.harness-helm/h2-compound.yml`: compound destination과 review gate 정책
 - `.harness-helm/scripts/`: validation과 workflow helper 구현
 - `.harness-helm/runs/`: run-local context, raw output, normalized draft, snapshot, restore backup
@@ -30,9 +30,12 @@
 
 feature가 아직 없으면 `{feature}` 대신 `_unscoped`를 사용합니다.
 
+## Archive Retention
+
+`h2-archive` 이후 archive-local `runs/`에는 `runs/` 바로 아래로 flatten된 Markdown 산출물(`plan-context-pack.md`, `design-context-pack.md`, `autorun-context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, `compound-candidates.md` 등)만 남깁니다. Archive root에는 `runs-summary.md`를 남깁니다. Run manifest, 임시 `runs/stage-runtime-summary.json`, run-id 디렉터리, snapshot, raw, normalized, promotion candidate, restore backup은 Markdown summary 생성 후 제거합니다.
+
 ## Avoid
 
 - `.harness-helm/runs/**`를 official KB로 취급하지 않습니다.
 - secret이나 raw log를 canonical docs로 그대로 옮기지 않습니다.
 - rewind 또는 archive review 중 archive residue를 자동 삭제하지 않습니다.
-

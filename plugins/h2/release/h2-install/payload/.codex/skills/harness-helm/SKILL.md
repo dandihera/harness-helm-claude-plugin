@@ -49,14 +49,14 @@ Keep technical identifiers, command names, file paths, frontmatter keys, proper 
 2. Use this `SKILL.md` for canonical `h2-*` command semantics, output fields, staging rules, and docs routing.
 3. Treat `.codex/skills/h2/SKILL.md` as a thin `$h2` alias only.
 4. Load bundled `references/*.md` only when detailed criteria, parity evidence, upstream mapping, normalization, or promotion rules are needed.
-5. Use `.harness-helm/h2-cartridge.yml` for editable provider, surface, fallback, and routing values when installed; otherwise use `references/cartridge-command-mapping.md` only for invocation recording, fallback handling, and routing invariants.
+5. Use `.harness-helm/h2-cartridge.yml` for editable provider, surface, fallback, routing, and output language values when installed; otherwise use `references/cartridge-command-mapping.md` only for invocation recording, fallback handling, and routing invariants.
 6. Use `.harness-helm/h2-compound.yml` for h2-compound domain refinement, canonical destination, review gate, and retrieval hook policy when installed; if absent, use built-in conservative defaults.
 
 ## Runtime Source Hierarchy
 
 - Source repository design records live in `cookbooks/`, but installed target projects do not include `cookbooks/`.
 - Installed runtime command semantics come from this `SKILL.md`, `references/core-workflow.md`, and `references/workflow-lifecycle-commands.md`.
-- Runtime provider and surface mapping comes from `.harness-helm/h2-cartridge.yml` when installed. Bundled upstream references are fallback guidance for invocation recording, fallback handling, and routing invariants, not cartridge value copies.
+- Runtime provider, surface, fallback, routing, and output language mapping comes from `.harness-helm/h2-cartridge.yml` when installed. Bundled upstream references are fallback guidance for invocation recording, fallback handling, and routing invariants, not cartridge value copies.
 - Runtime h2-compound knowledge policy comes from `.harness-helm/h2-compound.yml` when installed, with built-in conservative defaults as fallback.
 - Runtime schema validation comes from `.harness-helm/h2-schema.yml`.
 - Root `AGENTS.md` provides project-wide entrypoint guidance and must not duplicate the full workflow contract.
@@ -121,7 +121,7 @@ Internal canonical command ids:
 - `h2-ops`
 - `h2-cartridge`
 
-Use `.harness-helm/h2-cartridge.yml` as the shared source of truth for provider, surface, fallback label, routing target values, and upstream tool registry entries when it is installed. If it is absent in a target project, use bundled `references/cartridge-command-mapping.md` only for invocation recording, fallback handling, and routing invariants. Load `references/cartridge-tool-registry.md` for tool alternatives and registration rules, and `references/workflow-lifecycle-commands.md` when detailed workflow lifecycle command semantics are needed.
+Use `.harness-helm/h2-cartridge.yml` as the shared source of truth for provider, surface, fallback label, routing target, output language values, and upstream tool registry entries when it is installed. If it is absent in a target project, use bundled `references/cartridge-command-mapping.md` only for invocation recording, fallback handling, and routing invariants. Load `references/cartridge-tool-registry.md` for tool alternatives and registration rules, and `references/workflow-lifecycle-commands.md` when detailed workflow lifecycle command semantics are needed.
 
 ## Common Input
 
@@ -141,6 +141,8 @@ constraints:
 ```
 
 Minimum input is `command`, `feature`, and `task`. `h2-context` may use `feature: null`; in that case use `.harness-helm/runs/_unscoped/{run-id}/`.
+
+Issue-derived feature names use `<kebab-case-feature>_<issue-number>` by default, for example `snapshot-archive-scope_124`. If the workflow did not start from a GitHub/GitLab issue, use the plain kebab-case feature slug without a suffix, for example `h2-run-stats`. Multi-provider projects may use `_gh_` or `_gl_` only when issue-number collision must be avoided.
 
 ## Common Output
 
@@ -256,6 +258,7 @@ Recommended Markdown shape:
 - Support `code`, `qa`, `security`, and `cross` review types.
 - Route review candidates to `docs/03_review/{type}/{feature}.md`.
 - Run Cross Review only when the Cross Review policy criteria are met.
+- Write all generated review content in Korean. Technical identifiers, command names, file paths, and source quotations remain in their original form.
 - Set `next.recommended_h2_step` to `h2-report`.
 
 ### h2-report
@@ -284,8 +287,8 @@ Recommended Markdown shape:
 - Run `.harness-helm/scripts/harness archive {feature}` to execute the archive. Use `--dry-run` to preview changes without applying them.
 - In `h2-autorun`, `h2-archive` is an execute step, not a preview step. Use non-dry-run archive by default because the user has already requested automatic progression through the lifecycle.
 - Do not reimplement archive file movement.
-- `harness archive` moves `.harness-helm/runs/{feature}/` to `docs/_archive/{archive-folder}/runs/` rather than deleting it; run artifacts are preserved alongside archived phase docs.
-- After archive completes, run `.harness-helm/scripts/harness kb-index` to refresh `docs/_indexes/*.md` so the new archive manifest entry is registered. Include the regenerated index files in the same archive commit/PR; otherwise `harness-validate` (or equivalent CI) flags an index drift on the next push.
+- `harness archive` moves `.harness-helm/runs/{feature}/` to `docs/_archive/{archive-folder}/runs/`, writes transient `runs/stage-runtime-summary.json`, writes root `stage-runtime-summary.md`, then prunes the transient JSON and keeps only run root-level Markdown artifacts such as `context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, and `compound-candidates.md`; run manifests, snapshots, raw, normalized, promotion candidates, and restore backups are pruned after summary generation.
+- After archive completes, run `.harness-helm/scripts/harness kb-index` to refresh `docs/_indexes/*.md` after active docs move out of indexed locations. Include the regenerated index files in the same archive commit/PR; otherwise `harness-validate` (or equivalent CI) flags index drift on the next push.
 - Route to `.harness-helm/runs/{feature}/{run-id}/archive-plan.md`.
 - Set `next.recommended_h2_step` to `h2-ops` or `null`.
 
@@ -298,7 +301,7 @@ Recommended Markdown shape:
 ### h2-cartridge
 
 - Run `.harness-helm/scripts/harness cartridge-validate` when `.harness-helm/` is installed; otherwise inspect bundled `references/cartridge-command-mapping.md` for invocation recording, fallback handling, and routing invariants.
-- Confirm each command defines `provider`, `surface`, `fallback_label`, and `routing_target`.
+- Confirm each command defines `provider`, `surface`, `fallback_label`, `routing_target`, and `output_language`.
 - Record unavailable or invalid surfaces in `verification.not_verified` or `verification.required`.
 - Route to `.harness-helm/runs/{feature}/{run-id}/cartridge-mapping.md`.
 
@@ -317,7 +320,7 @@ Use the staging rules from this skill and bundled `references/core-workflow.md`:
 - Use `.harness-helm/runs/_unscoped/{run-id}/` when `feature` is unknown.
 - `run-id` format is `YYYYMMDD-HHMMSS-h2-{command}` using `Asia/Seoul`, and harness scripts validate it.
 - The runtime adapter executing the h2 command creates `raw/`, `normalized/`, and `promotion-candidates/`; `harness.py` validates and cleans them up but does not create them for every lifecycle command.
-- `.harness-helm/runs/**` is not official KB and is not default retrieval input. On `h2-archive`, the feature runs folder is moved to `docs/_archive/{archive-folder}/runs/` rather than deleted.
+- `.harness-helm/runs/**` is not official KB and is not default retrieval input. On `h2-archive`, the feature runs folder is moved to `docs/_archive/{archive-folder}/runs/` and then minimized to run-level Markdown artifacts only; archive root `stage-runtime-summary.md` keeps the human-readable timing summary.
 - Remove or mask sensitive/raw output before moving anything to official docs.
 
 ## Upstream Override Input

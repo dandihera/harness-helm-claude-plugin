@@ -215,13 +215,14 @@ external_tool_registry:
 # ============================================================================
 # commands: 14개 h2-* command별 실행 매핑
 # ============================================================================
-# 각 command는 아래 5개 필드로 정의된다.
+# 각 command는 아래 7개 필드로 정의된다.
 #   mode             command의 실행 모드 (context-pack/cartridge/recorder/validator 등)
 #   provider         primary upstream provider (또는 harness 자신)
 #   surface          provider가 노출하는 구체 skill/command 식별자
 #   alternatives     primary 미사용 시 시도할 다음 surface 우선순위
 #   fallback_label   모든 surface가 미사용이거나 prerequisite이 없을 때 남길 fallback/block 라벨
 #   routing_target   command 결과물이 저장될 경로 템플릿
+#   output_language  command가 생성하는 문서의 언어 (korean: 기술 식별자·경로·인용 소스 제외)
 #
 # {feature}, {run-id}, {type}, {topic}, {step} placeholder는 h2 command가 실행 시점에 치환한다.
 # ============================================================================
@@ -238,6 +239,7 @@ commands:
     alternatives: []
     fallback_label: verified-fallback:context-pack-only
     routing_target: .harness-helm/runs/{feature}/{run-id}/context-pack.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-plan: 목표/scope/done 기준/리스크를 확정한다.
@@ -255,6 +257,7 @@ commands:
       - writing-plans
     fallback_label: verified-fallback:gstack-plan-checklist
     routing_target: docs/01_plan/{feature}.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-design: 구현 흐름/인터페이스/데이터 흐름/검증 전략을 정리한다.
@@ -275,6 +278,7 @@ commands:
       - ce-brainstorm
     fallback_label: verified-fallback:compound-design-plan-checklist
     routing_target: docs/02_design/{feature}.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-autorun: h2-design 이후 lifecycle command를 자동 순차 실행한다.
@@ -288,6 +292,7 @@ commands:
     alternatives: []
     fallback_label: cartridge-checklist-fallback:autorun-summary
     routing_target: .harness-helm/runs/{feature}/{run-id}/autorun-summary.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-rewind: h2-autorun이 남긴 단계별 pre-step snapshot으로 특정 단계 직전
@@ -300,6 +305,7 @@ commands:
     alternatives: []
     fallback_label: blocked:no-snapshot
     routing_target: .harness-helm/runs/{feature}/{run-id}/snapshots/{step}/restore.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-analysis: plan/design consistency·risk·test coverage gap 점검.
@@ -314,6 +320,7 @@ commands:
       - verification-before-completion
     fallback_label: verified-fallback:gstack-superpowers-consistency-checklist
     routing_target: docs/02_design/{feature}.analysis.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-build: design 실행 산출물·변경 파일·리스크를 기록한다.
@@ -331,6 +338,7 @@ commands:
       - gstack-ship
     fallback_label: cartridge-checklist-fallback:changed-files-risk-recorder
     routing_target: .harness-helm/runs/{feature}/{run-id}/build.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-test: 실행한 테스트·skip 사유·실패 요약·남은 검증을 기록한다.
@@ -346,6 +354,7 @@ commands:
       - verification-before-completion
     fallback_label: cartridge-checklist-fallback:test-skip-or-result-recorder
     routing_target: .harness-helm/runs/{feature}/{run-id}/test.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-review: code/qa/security/cross review 결과를 표준 위치에 기록한다.
@@ -360,6 +369,7 @@ commands:
       - verification-before-completion
     fallback_label: cartridge-checklist-fallback:review-checklist
     routing_target: docs/03_review/{type}/{feature}.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-report: plan/design/analysis/build/test/review 결과를 묶고 release/docs/archive
@@ -375,6 +385,7 @@ commands:
       - gstack-ship
     fallback_label: verified-fallback:compound-promotion-checklist
     routing_target: docs/04_report/{feature}.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-compound: 해결 경험과 반복 가능한 지식을 canonical knowledge로 축적한다.
@@ -391,6 +402,7 @@ commands:
       - gstack-document-release
     fallback_label: verified-fallback:knowledge-compounding-checklist
     routing_target: .harness-helm/runs/{feature}/{run-id}/compound-candidates.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-archive: 01~04 산출물의 archive 이동 계획을 만든다.
@@ -404,6 +416,7 @@ commands:
       - archive-checklist
     fallback_label: cartridge-checklist-fallback:archive-boundary-check
     routing_target: .harness-helm/runs/{feature}/{run-id}/archive-plan.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-ops: runbook/incident/release/sweep 같은 운영 기록 후보를 정리한다.
@@ -423,6 +436,7 @@ commands:
       - ops-checklist
     fallback_label: cartridge-checklist-fallback:ops-candidate-checklist
     routing_target: docs/50_operations/{type}/{topic}.md
+    output_language: korean
 
   # --------------------------------------------------------------------------
   # h2-cartridge: provider/surface/routing config 무결성을 검증하는 meta command.
@@ -435,3 +449,4 @@ commands:
     alternatives: []
     fallback_label: blocked
     routing_target: .harness-helm/runs/{feature}/{run-id}/cartridge-mapping.md
+    output_language: korean

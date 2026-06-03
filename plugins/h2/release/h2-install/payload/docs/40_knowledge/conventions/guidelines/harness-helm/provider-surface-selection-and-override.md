@@ -212,7 +212,7 @@ permanent mapping change 검증:
 
 확인할 것:
 
-- cartridge의 `commands.*`가 `provider`, `surface`, `fallback_label`, `routing_target`을 가진다.
+- cartridge의 `commands.*`가 `provider`, `surface`, `fallback_label`, `routing_target`, `output_language`를 가진다.
 - override surface가 cartridge alternatives, runtime reference, upstream surface map, tool registry 중 하나에서 근거를 가진다.
 - upstream raw output이 h2 output contract로 정규화되어 있다.
 - run-level override는 cartridge 기준 변경처럼 기록되지 않는다.

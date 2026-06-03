@@ -7,8 +7,8 @@ owner: "tw-jang"
 security: internal
 confidence: medium
 related:
-  - "docs/_archive/2026-05/0529-010432_h2-install-powershell/h2-install-powershell.report.md"
-  - "docs/_archive/2026-05/0529-010432_h2-install-powershell/h2-install-powershell.analysis.design.md"
+  - "docs/_archive/2026-05/0529-0104_h2-install-powershell/h2-install-powershell.report.md"
+  - "docs/_archive/2026-05/0529-0104_h2-install-powershell/h2-install-powershell.analysis.design.md"
 source_references:
   - "cookbooks/0700-runbooks/0701-h2-install-build-and-install.md"
 module:
@@ -72,7 +72,7 @@ Windows 10/11 기본 환경에서 `python`이 PATH에 존재하지만 실제로�
 
 - tests: 본 wrapper의 `Resolve-Python` 자체는 stub 판별을 하지 않음을 정적 점검(`.harness-helm/runs/h2-install-powershell/20260529-004048-h2-test/test.md` T5)에서 확인. 실 stub 환경 동작은 Windows 검증자 위임 (test.md N5).
 - human_verified_by: tw-jang
-- 출처: ANALYSIS F2 (`docs/_archive/2026-05/0529-010432_h2-install-powershell/h2-install-powershell.analysis.design.md`), Runbook Section C 트러블슈팅 (`cookbooks/0700-runbooks/0701-h2-install-build-and-install.md`).
+- 출처: ANALYSIS F2 (`docs/_archive/2026-05/0529-0104_h2-install-powershell/h2-install-powershell.analysis.design.md`), Runbook Section C 트러블슈팅 (`cookbooks/0700-runbooks/0701-h2-install-build-and-install.md`).
 
 ## Pending Reason
 
@@ -85,7 +85,7 @@ Windows 10/11 기본 환경에서 `python`이 PATH에 존재하지만 실제로�
 ## References
 
 - Runbook Section C 트러블슈팅: `cookbooks/0700-runbooks/0701-h2-install-build-and-install.md`
-- Report: `docs/_archive/2026-05/0529-010432_h2-install-powershell/h2-install-powershell.report.md`
-- Analysis F2: `docs/_archive/2026-05/0529-010432_h2-install-powershell/h2-install-powershell.analysis.design.md`
+- Report: `docs/_archive/2026-05/0529-0104_h2-install-powershell/h2-install-powershell.report.md`
+- Analysis F2: `docs/_archive/2026-05/0529-0104_h2-install-powershell/h2-install-powershell.analysis.design.md`
 - 관련 wrapper: `release/install-package/h2-install.ps1` (Resolve-Python helper)
 - Microsoft 공식 docs: \"Manage app execution aliases\" (설정 → 앱 → 앱 실행 별칭)

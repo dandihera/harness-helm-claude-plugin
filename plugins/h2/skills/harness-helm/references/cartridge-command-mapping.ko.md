@@ -6,11 +6,11 @@ h2 invocation recording, fallback handling, routing invariant의 압축 runtime 
 
 ## 규칙
 
-`.harness-helm/h2-cartridge.yml`은 설치된 provider, surface, fallback label, routing target, alternatives, external tool registry 값의 기준입니다.
+`.harness-helm/h2-cartridge.yml`은 설치된 provider, surface, fallback label, routing target, output language, alternatives, external tool registry 값의 기준입니다.
 
 Target project에 cartridge file이 없으면 이 reference는 invocation recording, fallback handling, routing invariant에만 사용합니다. cartridge file을 사용할 수 없었다고 기록합니다.
 
-설치된 provider, surface, fallback label, routing target, alternatives, external tool registry 값은 `.harness-helm/h2-cartridge.yml`을 직접 읽어 확인합니다.
+설치된 provider, surface, fallback label, routing target, output language, alternatives, external tool registry 값은 `.harness-helm/h2-cartridge.yml`을 직접 읽어 확인합니다.
 
 ## Invocation Recording
 

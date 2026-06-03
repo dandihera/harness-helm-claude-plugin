@@ -21,7 +21,7 @@ Compact runtime snapshot of `0301 Core Workflow Spec`.
 - `h2-compound`: compound reusable knowledge. It may write low-risk `40_knowledge` learning/solution docs after checks, and stages governed canonical candidates until approval.
 - `h2-archive`: execute archive movement for completed 01-04 workflow artifacts and move the completed feature run-root through archive tooling. Use dry-run only when the user explicitly asks for preview-only behavior.
 - `h2-ops`: record operational follow-ups such as runbooks, releases, incidents, or branch cleanup.
-- `h2-cartridge`: inspect or update provider, surface, fallback, and routing mappings.
+- `h2-cartridge`: inspect or update provider, surface, fallback, routing, and output language mappings.
 
 ## Common Output
 

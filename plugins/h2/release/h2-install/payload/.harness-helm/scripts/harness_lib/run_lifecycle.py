@@ -8,14 +8,42 @@ from pathlib import Path
 from typing import Any
 
 from . import paths
-from .frontmatter import list_value, parse_frontmatter, raw_list_value
+from .frontmatter import list_value, parse_frontmatter, parse_simple_yaml, raw_list_value
 from .utils import now_kst
 
 
 STAGE_RUNTIME_SUMMARY_JSON_NAME = "stage-runtime-summary.json"
-STAGE_RUNTIME_SUMMARY_MD_NAME = "stage-runtime-summary.md"
+STAGE_RUNTIME_SUMMARY_MD_NAME = "runs-summary.md"
 LEGACY_RUNTIME_SUMMARY_NAME = "runtime-summary.json"
 LEGACY_RUNTIME_SUMMARY_WARNING = "legacy runtime-summary.json fallback"
+STAGE_RUNTIME_SUMMARY_TEMPLATE = "docs/_templates/runs-summary.md"
+DEFAULT_STAGE_RUNTIME_SUMMARY_MARKDOWN_TEMPLATE = """# Runs Summary: {{feature}}
+
+Generated: {{generated_at}}
+Archive: `{{archive_path}}`
+
+## Totals
+
+| result | stage_elapsed | archive_wall_clock | runs | warnings |
+|---|---:|---:|---:|---:|
+{{totals_rows}}
+
+## Runs
+
+| stage | result | duration | surface | run_id |
+|---|---|---:|---|---|
+{{runs_rows}}
+
+## Autorun Groups
+
+| autorun_id | stage_count | elapsed | stages | slowest_stage |
+|---|---:|---:|---|---|
+{{autorun_group_rows}}
+
+## Warnings
+
+{{warnings_block}}
+"""
 RUN_MANIFEST_NAME = "manifest.json"
 RUN_MANIFEST_FIELD_ORDER = [
     "schema_version",
@@ -109,6 +137,22 @@ def normalize_invocation_mode(value: Any) -> str:
     if isinstance(value, str) and value in INVOCATION_MODES:
         return value
     return "unknown"
+
+
+def cartridge_fallback_surface(command: str) -> str | None:
+    if not paths.CARTRIDGE_PATH.exists():
+        return None
+    cartridge = parse_simple_yaml(paths.CARTRIDGE_PATH.read_text(encoding="utf-8"))
+    commands = cartridge.get("commands")
+    if not isinstance(commands, dict):
+        return None
+    mapping = commands.get(command)
+    if not isinstance(mapping, dict):
+        return None
+    fallback_label = mapping.get("fallback_label")
+    if not isinstance(fallback_label, str) or not fallback_label:
+        return None
+    return f"fallback:{fallback_label}"
 
 
 def format_run_timestamp(value: dt.datetime) -> str:
@@ -333,7 +377,7 @@ def iter_archive_snapshot_stage_manifests(archive_path: Path) -> list[Path]:
 
 
 def is_archive_run_stats_path(path: Path) -> bool:
-    return (path / "runs").is_dir() and (path / "manifest.md").exists()
+    return (path / "runs").is_dir()
 
 
 def build_run_stats_entry(run_dir: Path, feature_override: str | None = None) -> RunStatsEntry:
@@ -348,11 +392,20 @@ def build_run_stats_entry(run_dir: Path, feature_override: str | None = None) ->
     started_at = manifest_started_at or run_id_started_at
     if manifest_started_at and abs((manifest_started_at - run_id_started_at).total_seconds()) >= 1:
         warnings.append("started_at differs from run-id timestamp")
+    command = str(manifest.get("command") or command_from_run_id(run_id_value))
+    invoked_surface = normalize_invoked_surface(manifest.get("invoked_surface"))
+    invocation_mode = normalize_invocation_mode(manifest.get("invocation_mode"))
+    if invoked_surface is None:
+        fallback_surface = cartridge_fallback_surface(command)
+        if fallback_surface is not None:
+            invoked_surface = fallback_surface
+            invocation_mode = "fallback"
+            warnings.append("invoked_surface filled from cartridge fallback_label because manifest metadata is missing")
     if not manifest:
         return RunStatsEntry(
             feature=feature,
             run_id=run_id_value,
-            command=command_from_run_id(run_id_value),
+            command=command,
             status="missing-manifest",
             started_at=started_at,
             completed_at=None,
@@ -360,11 +413,10 @@ def build_run_stats_entry(run_dir: Path, feature_override: str | None = None) ->
             manifest_path=None,
             warnings=warnings,
             autorun_id=None,
-            invoked_surface=None,
-            invocation_mode="unknown",
+            invoked_surface=invoked_surface,
+            invocation_mode=invocation_mode,
         )
     completed_at = parse_run_timestamp(manifest.get("completed_at"))
-    command = str(manifest.get("command") or command_from_run_id(run_id_value))
     status = str(manifest.get("status") or "incomplete") if manifest_exists else "missing-manifest"
     elapsed = None
     if completed_at and started_at and status not in {"missing-manifest", "running", "incomplete"}:
@@ -380,8 +432,8 @@ def build_run_stats_entry(run_dir: Path, feature_override: str | None = None) ->
         manifest_path=manifest_path if manifest_exists else None,
         warnings=warnings,
         autorun_id=manifest.get("autorun_id") if isinstance(manifest.get("autorun_id"), str) else None,
-        invoked_surface=normalize_invoked_surface(manifest.get("invoked_surface")),
-        invocation_mode=normalize_invocation_mode(manifest.get("invocation_mode")),
+        invoked_surface=invoked_surface,
+        invocation_mode=invocation_mode,
     )
 
 
@@ -574,67 +626,133 @@ def _markdown_cell(value: Any) -> str:
     return str(value).replace("|", "\\|")
 
 
+def _stage_runtime_summary_template_text() -> str:
+    path = paths.ROOT / STAGE_RUNTIME_SUMMARY_TEMPLATE
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return DEFAULT_STAGE_RUNTIME_SUMMARY_MARKDOWN_TEMPLATE
+
+
+def _render_stage_runtime_summary_template(template: str, values: dict[str, Any]) -> str:
+    rendered = template
+    for key, value in values.items():
+        rendered = rendered.replace("{{" + key + "}}", str(value))
+    return rendered.rstrip() + "\n"
+
+
+def _stage_runtime_summary_result(runs: list[dict[str, Any]], warnings: list[str]) -> str:
+    if not runs:
+        return "empty"
+    statuses = {str(run.get("status") or "") for run in runs}
+    if statuses.intersection({"failed", "error", "incomplete"}):
+        return "attention"
+    if warnings:
+        return "warning"
+    return "completed"
+
+
+def _autorun_group_stage_entries(runs: list[dict[str, Any]], autorun_id: Any) -> list[dict[str, Any]]:
+    if not autorun_id:
+        return []
+    return [run for run in runs if run.get("autorun_id") == autorun_id]
+
+
+def _autorun_group_stages(runs: list[dict[str, Any]], autorun_id: Any) -> str:
+    entries = _autorun_group_stage_entries(runs, autorun_id)
+    return ", ".join(str(entry.get("command") or "") for entry in entries if entry.get("command"))
+
+
+def _autorun_group_slowest_stage(runs: list[dict[str, Any]], autorun_id: Any) -> str:
+    entries = [
+        entry
+        for entry in _autorun_group_stage_entries(runs, autorun_id)
+        if isinstance(entry.get("elapsed_seconds"), int)
+    ]
+    if not entries:
+        return ""
+    slowest = max(entries, key=lambda entry: entry.get("elapsed_seconds") or 0)
+    command = str(slowest.get("command") or "")
+    elapsed = str(slowest.get("elapsed") or "")
+    if not command:
+        return elapsed
+    if not elapsed:
+        return command
+    return f"{command} ({elapsed})"
+
+
 def render_stage_runtime_summary_markdown(summary: dict[str, Any]) -> str:
     feature = str(summary.get("feature") or "")
-    lines = [
-        f"# Stage Runtime Summary: {feature}",
-        "",
-        f"Generated: {summary.get('generated_at') or ''}",
-        f"Archive: `{summary.get('archive_path') or ''}`",
-        "",
-        "## Totals",
-        "",
-        f"- stage elapsed: {summary.get('total_elapsed') or 'not available'}",
-        f"- archive wall-clock: {summary.get('archive_wall_clock') or 'not available'}",
-        "",
-        "## Runs",
-        "",
-        "| run_id | command | status | invoked_surface | started_at | elapsed |",
-        "|---|---|---|---|---|---|",
-    ]
     runs = [item for item in raw_list_value(summary.get("runs")) if isinstance(item, dict)]
+    groups = [item for item in raw_list_value(summary.get("autorun_groups")) if isinstance(item, dict)]
+    warnings = list_value(summary.get("warnings"))
+    totals_rows = (
+        "| "
+        + " | ".join(
+            [
+                _markdown_cell(_stage_runtime_summary_result(runs, warnings)),
+                _markdown_cell(summary.get("total_elapsed") or "not available"),
+                _markdown_cell(summary.get("archive_wall_clock") or "not available"),
+                _markdown_cell(len(runs)),
+                _markdown_cell(len(warnings)),
+            ]
+        )
+        + " |"
+    )
+    run_rows: list[str] = []
     if runs:
         for run in runs:
-            lines.append(
+            run_rows.append(
                 "| "
                 + " | ".join(
                     [
-                        _markdown_cell(run.get("run_id")),
                         _markdown_cell(run.get("command")),
                         _markdown_cell(run.get("status")),
-                        _markdown_cell(run.get("invoked_surface")),
-                        _markdown_cell(run.get("started_at")),
                         _markdown_cell(run.get("elapsed")),
+                        _markdown_cell(run.get("invoked_surface")),
+                        _markdown_cell(run.get("run_id")),
                     ]
                 )
                 + " |"
             )
     else:
-        lines.append("| none |  |  |  |  |  |")
-    lines.extend(["", "## Autorun Groups", "", "| autorun_id | stage_count | elapsed |", "|---|---:|---|"])
-    groups = [item for item in raw_list_value(summary.get("autorun_groups")) if isinstance(item, dict)]
+        run_rows.append("| none |  |  |  |  |")
+    autorun_group_rows: list[str] = []
     if groups:
         for group in groups:
-            lines.append(
+            autorun_group_rows.append(
                 "| "
                 + " | ".join(
                     [
                         _markdown_cell(group.get("autorun_id")),
                         _markdown_cell(group.get("stage_count")),
                         _markdown_cell(group.get("elapsed")),
+                        _markdown_cell(_autorun_group_stages(runs, group.get("autorun_id"))),
+                        _markdown_cell(_autorun_group_slowest_stage(runs, group.get("autorun_id"))),
                     ]
                 )
                 + " |"
             )
     else:
-        lines.append("| none | 0 |  |")
-    lines.extend(["", "## Warnings", ""])
-    warnings = list_value(summary.get("warnings"))
+        autorun_group_rows.append("| none | 0 |  |  |  |")
     if warnings:
-        lines.extend(f"- {warning}" for warning in warnings)
+        warning_lines = ["| count | warning |", "|---:|---|"]
+        for index, warning in enumerate(warnings, start=1):
+            warning_lines.append(f"| {index} | {_markdown_cell(warning)} |")
+        warnings_block = "\n".join(warning_lines)
     else:
-        lines.append("- none")
-    return "\n".join(lines) + "\n"
+        warnings_block = "- none"
+    return _render_stage_runtime_summary_template(
+        _stage_runtime_summary_template_text(),
+        {
+            "feature": feature,
+            "generated_at": summary.get("generated_at") or "",
+            "archive_path": summary.get("archive_path") or "",
+            "totals_rows": totals_rows,
+            "runs_rows": "\n".join(run_rows),
+            "autorun_group_rows": "\n".join(autorun_group_rows),
+            "warnings_block": warnings_block,
+        },
+    )
 
 
 def write_runtime_summary(archive_path: Path, generated_at: dt.datetime | None = None) -> Path:

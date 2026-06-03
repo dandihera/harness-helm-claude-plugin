@@ -21,7 +21,7 @@ tags:
 
 # Cartridge command mapping
 
-`.harness-helm/h2-cartridge.yml`은 h2 command별 provider, surface, fallback label, routing target의 실행 기준이다.
+`.harness-helm/h2-cartridge.yml`은 h2 command별 provider, surface, fallback label, routing target, output language의 실행 기준이다.
 
 ## 기준
 
@@ -36,7 +36,7 @@ tags:
 - 값 검증: `.harness-helm/scripts/harness cartridge-validate --strict`
 - snapshot 검증: `.harness-helm/scripts/harness reference-validate --strict`
 
-Runtime snapshot reference는 cartridge 값의 사본이 아니다. Snapshot은 invocation 기록 방식, fallback 처리, routing invariant를 압축해 설명한다. 설치된 provider, surface, fallback label, routing target, alternatives, external tool registry 값은 `.harness-helm/h2-cartridge.yml`을 직접 읽어 확인한다.
+Runtime snapshot reference는 cartridge 값의 사본이 아니다. Snapshot은 invocation 기록 방식, fallback 처리, routing invariant를 압축해 설명한다. 설치된 provider, surface, fallback label, routing target, output language, alternatives, external tool registry 값은 `.harness-helm/h2-cartridge.yml`을 직접 읽어 확인한다.
 
 ## 기록 규칙
 
@@ -47,4 +47,4 @@ Runtime snapshot reference는 cartridge 값의 사본이 아니다. Snapshot은 
 
 ## 변경 규칙
 
-기본 provider/surface를 바꾸려면 `.harness-helm/h2-cartridge.yml`을 갱신하고, 관련 runtime snapshot은 값 사본이 아니라 책임·기록 규칙·routing invariant가 여전히 맞는지 확인한다. 일회성 override는 cartridge default 변경으로 기록하지 않는다.
+기본 provider/surface/output language를 바꾸려면 `.harness-helm/h2-cartridge.yml`을 갱신하고, 관련 runtime snapshot은 값 사본이 아니라 책임·기록 규칙·routing invariant가 여전히 맞는지 확인한다. 일회성 override는 cartridge default 변경으로 기록하지 않는다.

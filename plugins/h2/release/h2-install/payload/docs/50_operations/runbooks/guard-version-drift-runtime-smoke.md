@@ -8,7 +8,7 @@ security: internal
 confidence: medium
 related:
   - https://github.com/dandihera/harness-helm/issues/115
-  - docs/_archive/2026-06/0602-140433_guard-version-drift/guard-version-drift.report.md
+  - docs/_archive/2026-06/0602-1404_guard-version-drift/guard-version-drift.report.md
 module:
   - workflow
 tags:
@@ -110,7 +110,7 @@ ops: guard version drift live Claude Code runtime smoke
 >
 > - #115
 > - `docs/50_operations/runbooks/guard-version-drift-runtime-smoke.md`
-> - `docs/_archive/2026-06/0602-140433_guard-version-drift/guard-version-drift.report.md`
+> - `docs/_archive/2026-06/0602-1404_guard-version-drift/guard-version-drift.report.md`
 
 ## h2 Output
 
@@ -120,10 +120,10 @@ feature: guard-version-drift-runtime-smoke
 status: draft
 context_pack:
   primary_docs:
-    - docs/_archive/2026-06/0602-140433_guard-version-drift/guard-version-drift.report.md
+    - docs/_archive/2026-06/0602-1404_guard-version-drift/guard-version-drift.report.md
     - release/_payload_lib.py
   supporting_docs:
-    - docs/_archive/2026-06/0602-140433_guard-version-drift/runs/20260602-140004-h2-autorun/test.md
+    - docs/_archive/2026-06/0602-1404_guard-version-drift/runs/20260602-140004-h2-autorun/test.md
   canonical_knowledge:
     - prompt-level guard requires live runtime smoke before release confidence is high
   excluded_by_policy:

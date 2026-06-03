@@ -11,7 +11,7 @@
 - `harness-helm`: 공통 h2 command semantics, output contract, routing, staging, boundary.
 - `h2`: `$h2 ...` 또는 slash command entrypoint를 위한 짧은 user-facing alias.
 - Runtime references: command semantics, adapter, upstream mapping, parity, operational guideline을 위한 compact snapshot.
-- `.harness-helm/h2-cartridge.yml`: 설치되어 있을 때 provider, surface, fallback label, routing target, registry의 기준.
+- `.harness-helm/h2-cartridge.yml`: 설치되어 있을 때 provider, surface, fallback label, routing target, output language, registry의 기준.
 
 ## Required h2 Commands
 

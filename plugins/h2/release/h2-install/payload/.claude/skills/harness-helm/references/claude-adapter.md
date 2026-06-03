@@ -19,7 +19,7 @@ Claude Code should support:
 - Slash command files are thin aliases.
 - `.claude/skills/harness-helm/SKILL.md` owns runtime command guidance.
 - `references/` stores compact runtime snapshots.
-- `.harness-helm/h2-cartridge.yml` owns provider, surface, fallback, routing, and registry values when installed.
+- `.harness-helm/h2-cartridge.yml` owns provider, surface, fallback, routing, output language, and registry values when installed.
 
 ## Boundaries
 

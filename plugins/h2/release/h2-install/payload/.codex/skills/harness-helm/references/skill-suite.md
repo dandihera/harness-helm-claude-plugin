@@ -11,7 +11,7 @@ Compact runtime snapshot of `0302 Skill Suite`.
 - `harness-helm`: common h2 command semantics, output contract, routing, staging, and boundaries.
 - `h2`: short user-facing alias for `$h2 ...` or slash command entrypoints.
 - Runtime references: compact snapshots for command semantics, adapters, upstream mapping, parity, and operational guidelines.
-- `.harness-helm/h2-cartridge.yml`: provider, surface, fallback label, routing target, and registry source of truth when installed.
+- `.harness-helm/h2-cartridge.yml`: provider, surface, fallback label, routing target, output language, and registry source of truth when installed.
 
 ## Required h2 Commands
 

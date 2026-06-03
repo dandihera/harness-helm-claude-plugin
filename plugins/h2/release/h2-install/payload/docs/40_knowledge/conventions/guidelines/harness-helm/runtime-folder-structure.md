@@ -25,10 +25,11 @@ tags:
 ## 주요 파일
 
 - `.harness-helm/h2-schema.yml`: docs frontmatter와 validation 정책
-- `.harness-helm/h2-cartridge.yml`: provider/surface/fallback/routing mapping
+- `.harness-helm/h2-cartridge.yml`: provider/surface/fallback/routing/output language mapping
 - `.harness-helm/h2-compound.yml`: compound write boundary와 review gate
 - `.harness-helm/scripts/harness.py`: validation과 workflow helper 구현
 - `.harness-helm/runs/_templates/`: run artifact template
+- `docs/_templates/runs-summary.md`: archive root `runs-summary.md`의 Markdown template. 타이틀, 섹션명, 컬럼명 같은 사람이 읽는 문구는 이 template에서 관리하고, renderer는 summary row block만 주입한다.
 
 ## Run staging
 
@@ -51,7 +52,7 @@ tags:
 
 ## Run manifest
 
-`manifest.json`은 run folder 단위의 timing metadata다. 공식 docs가 아니라 run staging 증거이며, `h2-archive`가 이 파일과 autorun snapshot timing manifest를 읽어 archive-local `runs/stage-runtime-summary.json`과 root `stage-runtime-summary.md`를 생성한다. `harness run-stats`는 완료된 archive에서는 `runs/stage-runtime-summary.json`을 우선 읽고, summary가 없는 legacy archive나 active run 조회에서만 manifest를 직접 스캔한다.
+`manifest.json`은 run folder 단위의 timing metadata다. 공식 docs가 아니라 run staging 증거이며, `h2-archive`가 이 파일과 autorun snapshot timing manifest를 읽어 임시 `runs/stage-runtime-summary.json`과 archive root `runs-summary.md`를 생성한다. 최종 archive에서는 Markdown summary를 남기고 임시 JSON과 manifest를 제거한다. `harness run-stats`는 active run 조회 또는 legacy summary JSON이 남은 archive에서 구조화 stats를 제공한다.
 
 ```json
 {
@@ -84,22 +85,23 @@ tags:
 
 ## Runtime summary
 
-`h2-archive`는 완료된 feature의 archive root에 사용자 확인용 `stage-runtime-summary.md`를 생성하고, archive root의 `runs/` 아래에 machine-readable `stage-runtime-summary.json`을 생성한다.
+`h2-archive`는 완료된 feature의 archive root에 사용자 확인용 `runs-summary.md`를 생성한다. 생성 과정에서 `runs/stage-runtime-summary.json`을 임시로 쓸 수 있지만 최종 archive pruning 후에는 보존하지 않는다.
 
 ```text
 docs/_archive/{month}/{timestamp}_{feature}/
-├── manifest.md
-├── stage-runtime-summary.md
+├── runs-summary.md
 └── runs/
-    ├── stage-runtime-summary.json
-    └── {run-id}/
-        ├── manifest.json
-        └── snapshots/
-            └── {step}/
-                └── manifest.json
+    ├── plan-context-pack.md
+    ├── design-context-pack.md
+    ├── autorun-context-pack.md
+    ├── archive-plan.md
+    ├── autorun-summary.md
+    ├── build.md
+    ├── test.md
+    └── compound-candidates.md
 ```
 
-`runs/stage-runtime-summary.json`은 archive 시점의 immutable timing summary다. 포함 필드는 다음 의미를 가진다.
+`runs-summary.md`는 archive 시점의 timing summary다. 생성 직전의 임시 JSON summary는 다음 값을 기반으로 Markdown을 렌더링한다.
 
 - `runs`: 단계별 `run_id`, `command`, `status`, `started_at`, `completed_at`, `elapsed_seconds`, `invoked_surface`, `invocation_mode`
 - `total_elapsed_seconds`: 단계별 elapsed 합계. Autorun child stage snapshot entry가 있으면 direct `h2-autorun` parent elapsed는 중복 합산하지 않고 wall-clock evidence로만 둔다.
@@ -107,11 +109,25 @@ docs/_archive/{month}/{timestamp}_{feature}/
 - `autorun_groups`: 동일 `autorun_id`로 묶인 child stage의 pipeline total
 - `warnings`: legacy archive fallback, run-id timestamp mismatch, snapshot stage timing 누락 등 조회자가 알아야 할 조건
 
+Archive root의 `runs-summary.md`는 `docs/_templates/runs-summary.md`를 읽어 생성한다. Template은 사람이 읽는 타이틀, 섹션명, 컬럼명을 담고, `harness_lib.run_lifecycle` renderer는 다음 placeholder에 동적 값을 주입한다.
+
+- `{{feature}}`
+- `{{generated_at}}`
+- `{{archive_path}}`
+- `{{totals_rows}}`
+- `{{runs_rows}}`
+- `{{autorun_group_rows}}`
+- `{{warnings_block}}`
+
+Target runtime에 template이 없으면 renderer의 built-in fallback template으로 같은 기본 구조를 출력한다. Summary JSON은 machine-readable source of truth이고, Markdown template은 human-readable presentation layer다.
+
 Autorun child stage는 normal run folder가 아니라 `runs/{autorun_run_id}/snapshots/{step}/manifest.json`에서 수집된다. 이 summary entry의 `run_id`는 `{autorun_run_id}/{step}` 형태의 표시용 synthetic id일 수 있으며, filesystem run-id validator 대상이 아니다.
 
-Summary가 있는 archive path에 대해 `harness run-stats <archive-path>`를 실행하면 manifest를 재계산하지 않고 `runs/stage-runtime-summary.json`을 읽는다. 새 summary가 없고 legacy root `runtime-summary.json`이 있으면 이를 읽되 warning에 `legacy runtime-summary.json fallback`을 추가한다. 두 summary가 모두 없는 archive는 `runs/**/manifest.json`을 스캔한다. `manifest.md`만 있는 legacy run dir는 run-level JSON manifest가 없는 것으로 보고 `missing-manifest`로 표시한다.
+Legacy JSON summary가 있는 archive path에 대해 `harness run-stats <archive-path>`를 실행하면 manifest를 재계산하지 않고 summary JSON을 읽는다. 새 summary가 없고 legacy root `runtime-summary.json`이 있으면 이를 읽되 warning에 `legacy runtime-summary.json fallback`을 추가한다. 두 summary가 모두 없는 archive는 `runs/**/manifest.json`을 스캔한다. 최종 pruning이 끝난 archive에서는 `runs-summary.md`가 사람이 확인하는 timing source다. `manifest.md`만 있는 legacy run dir는 run-level JSON manifest가 없는 것으로 보고 `missing-manifest`로 표시한다.
 
-`stage-runtime-summary.json` 생성이 완료된 feature의 active `.harness-helm/runs/{feature}/` 폴더는 더 이상 stats source가 아니다. 필요한 run evidence는 archive root 아래 `runs/`로 이동된 상태여야 하며, active run folder는 삭제할 수 있다. 테스트 fixture도 active `.harness-helm/runs/` 아래에 남기지 않는다. `run-stats` 검증은 archive-local `runs/stage-runtime-summary.json`을 우선 사용한다.
+`runs-summary.md` 생성이 완료된 archive에서는 `runs/` 아래에 flatten된 Markdown 산출물(`plan-context-pack.md`, `design-context-pack.md`, `autorun-context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, `compound-candidates.md` 등)만 장기 보존한다. Run `manifest.json`, 임시 `stage-runtime-summary.json`, `snapshots/`, `restore-backups/`, `raw/`, `normalized/`, `promotion-candidates/`와 run-id 디렉터리는 summary 생성 후 제거된다. 이름 충돌이 있으면 deterministic suffix를 붙인다.
+
+`runs-summary.md` 생성이 완료된 feature의 active `.harness-helm/runs/{feature}/` 폴더는 더 이상 stats source가 아니다. 필요한 runtime evidence는 archive root의 `runs-summary.md`와 archive-local `runs/*.md` 산출물에 남아야 하며, active run folder는 삭제할 수 있다. 테스트 fixture도 active `.harness-helm/runs/` 아래에 남기지 않는다.
 
 ## Run timing helper
 
@@ -133,7 +149,9 @@ harness h2-snapshot complete --feature <feature> --run-id <autorun-run-id> --ste
 
 `h2-snapshot save`도 invocation options를 받을 수 있지만, 생략하면 해당 field를 쓰지 않는다. Child stage의 최종 invocation metadata는 `h2-snapshot complete`가 기록한다.
 
-`harness run-stats [feature-or-archive-path]`는 feature별 run elapsed time을 출력한다. feature 인자를 생략하면 active run folder의 feature별 최신 run summary를 출력한다. Archive path를 넘기면 archive-local `runs/stage-runtime-summary.json`을 우선 사용한다.
+`h2-archive` child stage도 timing/source evidence를 위해 snapshot manifest는 유지한다. 다만 archive 자체가 `docs/_archive/`에 plan/design/review/report 원문을 보존하므로, 신규 `h2-archive` snapshot은 active docs를 `snapshots/h2-archive/files/docs/**`로 다시 복사하지 않는다. Manifest의 `files`는 빈 list일 수 있으며, `h2-snapshot complete`가 archive artifact path와 completed timing을 기록한다. 기존 legacy `h2-archive` snapshot manifest가 있는 경우 `h2-snapshot list`와 `h2-snapshot restore --dry-run`은 계속 허용하고, archive residue는 자동 삭제하지 않고 경고만 남긴다.
+
+`harness run-stats [feature-or-archive-path]`는 feature별 run elapsed time을 출력한다. feature 인자를 생략하면 active run folder의 feature별 최신 run summary를 출력한다. Archive path를 넘기면 legacy summary JSON 또는 남아 있는 manifest를 사용한다. 최종 pruning이 끝난 archive의 사람이 읽는 timing 기록은 `runs-summary.md`다.
 
 ## 금지
 

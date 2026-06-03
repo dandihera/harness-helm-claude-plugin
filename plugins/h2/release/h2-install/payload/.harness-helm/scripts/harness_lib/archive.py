@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import paths
 from .frontmatter import parse_frontmatter, render_frontmatter
-from .run_lifecycle import stage_runtime_summary_json_path, stage_runtime_summary_md_path, write_runtime_summary
+from .run_lifecycle import command_from_run_id, stage_runtime_summary_json_path, stage_runtime_summary_md_path, write_runtime_summary
 from .utils import now_kst, read_text, write_text
 
 
@@ -49,14 +49,15 @@ def archived_text(text: str) -> str:
 
 
 def archive_destination(dest_root: Path, phase: str, src: Path) -> Path:
-    suffix = re.sub(r"^\d+_", "", phase)
+    phase_number = phase.split("_", 1)[0]
+    phase_suffix = re.sub(r"^\d+_", "", phase)
     if src.is_dir():
-        return dest_root / f"{src.name}.{suffix}"
+        return dest_root / f"{phase_number}.{src.name}.{phase_suffix}"
     # docs/03_review/{type}/{feature}.md: 동일 feature가 여러 review type(code/qa/security/cross)을
     # 가질 때 destination 충돌을 막기 위해 review type을 파일명에 포함한다.
     if phase == "03_review" and src.parent.name in {"code", "qa", "security", "cross"}:
-        return dest_root / f"{src.stem}.{src.parent.name}.{suffix}{src.suffix}"
-    return dest_root / f"{src.stem}.{suffix}{src.suffix}"
+        return dest_root / f"{phase_number}.{src.stem}.{src.parent.name}.{phase_suffix}{src.suffix}"
+    return dest_root / f"{phase_number}.{src.stem}.{phase_suffix}{src.suffix}"
 
 
 def cleanup_archived_run(feature: str, dry_run: bool, dest_root: Path | None = None) -> None:
@@ -73,6 +74,91 @@ def cleanup_archived_run(feature: str, dry_run: bool, dest_root: Path | None = N
         print(f"  {'would remove' if dry_run else 'remove'} {run_path.relative_to(paths.ROOT)}")
         if not dry_run:
             shutil.rmtree(run_path)
+
+
+def stage_label_from_command(command: str | None, fallback: str = "run") -> str:
+    if command:
+        return command.removeprefix("h2-")
+    return fallback
+
+
+def archived_run_command(run_dir: Path) -> str | None:
+    manifest_path = run_dir / "manifest.json"
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(read_text(manifest_path))
+        except json.JSONDecodeError:
+            manifest = {}
+        if isinstance(manifest, dict) and isinstance(manifest.get("command"), str):
+            return manifest["command"]
+    try:
+        return command_from_run_id(run_dir.name)
+    except ValueError:
+        return None
+
+
+def artifact_stage_label(command: str | None, artifact: Path) -> str:
+    command_label = stage_label_from_command(command)
+    if command == "h2-autorun":
+        autorun_artifact_stages = {
+            "archive-plan": "archive",
+            "autorun-summary": "autorun",
+            "build": "build",
+            "compound-candidates": "compound",
+            "review": "review",
+            "report": "report",
+            "test": "test",
+        }
+        return autorun_artifact_stages.get(artifact.stem, command_label)
+    return command_label
+
+
+def flattened_artifact_name(command: str | None, artifact: Path) -> str:
+    label = artifact_stage_label(command, artifact)
+    if artifact.name == "context-pack.md":
+        return f"{label}-context-pack.md"
+    return artifact.name
+
+
+def collision_safe_destination(runs_root: Path, name: str, stage_label: str, seen: dict[str, int]) -> Path:
+    if name not in seen and not (runs_root / name).exists():
+        seen[name] = 1
+        return runs_root / name
+    source = Path(name)
+    index = seen.get(name, 1) + 1
+    while True:
+        target = runs_root / f"{source.stem}--{stage_label}-{index}{source.suffix}"
+        if not target.exists():
+            seen[name] = index
+            return target
+        index += 1
+
+
+def prune_archived_runs(dest_root: Path) -> None:
+    runs_root = dest_root / "runs"
+    if not runs_root.exists() or not runs_root.is_dir():
+        return
+    seen: dict[str, int] = {}
+    for child in sorted(runs_root.iterdir()):
+        if child.is_file():
+            child.unlink()
+            continue
+        if not child.is_dir():
+            continue
+        if not paths.RUN_ID_PATTERN.match(child.name):
+            shutil.rmtree(child)
+            continue
+        command = archived_run_command(child)
+        for item in sorted(child.iterdir()):
+            if item.is_file():
+                if item.suffix == ".md":
+                    stage_label = artifact_stage_label(command, item)
+                    target_name = flattened_artifact_name(command, item)
+                    target = collision_safe_destination(runs_root, target_name, stage_label, seen)
+                    shutil.move(str(item), str(target))
+                continue
+            shutil.rmtree(item)
+        shutil.rmtree(child)
 
 
 def complete_archived_archive_snapshots(dest_root: Path, completed_at: dt.datetime) -> None:
@@ -92,14 +178,31 @@ def complete_archived_archive_snapshots(dest_root: Path, completed_at: dt.dateti
         manifest["autorun_id"] = manifest.get("autorun_id") or manifest.get("run_id")
         artifacts = manifest.get("artifact_paths") if isinstance(manifest.get("artifact_paths"), list) else []
         for artifact in [
-            paths.repository_rel(dest_root / "manifest.md"),
-            paths.repository_rel(stage_runtime_summary_json_path(dest_root)),
             paths.repository_rel(stage_runtime_summary_md_path(dest_root)),
         ]:
             if artifact not in artifacts:
                 artifacts.append(artifact)
         manifest["artifact_paths"] = artifacts
         write_text(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+        parent_manifest_path = manifest_path.parents[2] / "manifest.json"
+        if parent_manifest_path.exists():
+            try:
+                parent_manifest = json.loads(read_text(parent_manifest_path))
+            except json.JSONDecodeError:
+                parent_manifest = {}
+            if isinstance(parent_manifest, dict) and parent_manifest.get("command") == "h2-autorun":
+                parent_manifest["status"] = "completed"
+                parent_manifest["completed_at"] = completed_at.isoformat()
+                parent_artifacts = (
+                    parent_manifest.get("artifact_paths")
+                    if isinstance(parent_manifest.get("artifact_paths"), list)
+                    else []
+                )
+                summary_artifact = paths.repository_rel(stage_runtime_summary_md_path(dest_root))
+                if summary_artifact not in parent_artifacts:
+                    parent_artifacts.append(summary_artifact)
+                parent_manifest["artifact_paths"] = parent_artifacts
+                write_text(parent_manifest_path, json.dumps(parent_manifest, ensure_ascii=False, indent=2) + "\n")
 
 
 def command_cleanup_runs(args: argparse.Namespace) -> int:
@@ -141,29 +244,13 @@ def command_archive(args: argparse.Namespace) -> int:
     except ValueError as error:
         print(f"harness archive: {error}")
         return 1
-    timestamp = now.strftime("%m%d-%H%M%S")
+    timestamp = now.strftime("%m%d-%H%M")
     dest_dir_name = f"{timestamp}_{feature}"
     dest_root = paths.DOCS / "_archive" / month / dest_dir_name
     sources = find_phase_sources(feature)
     if not sources:
         print(f"harness archive: no sources found for feature={feature}")
         return 1 if args.strict else 0
-    owner = None
-    for _, src in sources:
-        if src.is_file():
-            owner = parse_frontmatter(read_text(src))[0].get("owner")
-            if owner:
-                break
-    manifest = {
-        "feature": feature,
-        "archived_at": now.isoformat(),
-        "archive_path": dest_root.relative_to(paths.ROOT).as_posix(),
-        "owner": owner,
-        "source_trace": (args.source_trace or args.source_issue) or None,
-        "source_pr": args.source_pr or None,
-        "phase_docs_present": sorted({phase for phase, _ in sources}),
-        "purpose": "Archive completed 01~04 PDCA artifacts; body excluded from default retrieval.",
-    }
     print(f"harness archive: feature={feature}")
     for phase, src in sources:
         rel_dest = archive_destination(dest_root, phase, src)
@@ -181,26 +268,14 @@ def command_archive(args: argparse.Namespace) -> int:
             text = archived_text(read_text(src))
             write_text(rel_dest, text)
             src.unlink()
-    manifest_path = dest_root / "manifest.md"
     if args.dry_run:
-        print(f"  would write manifest {manifest_path.relative_to(paths.ROOT)}")
-        print(f"  would write stage runtime summary {stage_runtime_summary_json_path(dest_root).relative_to(paths.ROOT)}")
-        print(f"  would write stage runtime summary markdown {stage_runtime_summary_md_path(dest_root).relative_to(paths.ROOT)}")
+        print(f"  would write transient stage runtime summary {stage_runtime_summary_json_path(dest_root).relative_to(paths.ROOT)}")
+        print(f"  would write runs summary markdown {stage_runtime_summary_md_path(dest_root).relative_to(paths.ROOT)}")
+        print(f"  would prune transient stage runtime summary {stage_runtime_summary_json_path(dest_root).relative_to(paths.ROOT)}")
         cleanup_archived_run(feature, dry_run=True, dest_root=dest_root)
     if not args.dry_run:
-        lines = ["---"]
-        for key, value in manifest.items():
-            if isinstance(value, list):
-                lines.append(f"{key}:")
-                for item in value:
-                    lines.append(f"  - {item}")
-            elif value is None:
-                lines.append(f"{key}: null")
-            else:
-                lines.append(f"{key}: {value}")
-        lines.extend(["---", "", f"# Archive Manifest: {feature}", "", "Archive manifest metadata only. Do not include detailed implementation content here.", ""])
-        write_text(manifest_path, "\n".join(lines))
         cleanup_archived_run(feature, dry_run=False, dest_root=dest_root)
         complete_archived_archive_snapshots(dest_root, completed_at=now)
         write_runtime_summary(dest_root, generated_at=now)
+        prune_archived_runs(dest_root)
     return 0

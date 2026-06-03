@@ -43,16 +43,7 @@ STEP_SNAPSHOT_SCOPE: dict[str, list[str]] = {
     "h2-compound": [
         ".harness-helm/runs/{feature}/{run_id}/compound-candidates.md",
     ],
-    "h2-archive": [
-        "docs/01_plan/{feature}.md",
-        "docs/02_design/{feature}.md",
-        "docs/02_design/{feature}.analysis.md",
-        "docs/03_review/code/{feature}.md",
-        "docs/03_review/qa/{feature}.md",
-        "docs/03_review/security/{feature}.md",
-        "docs/03_review/cross/{feature}.md",
-        "docs/04_report/{feature}.md",
-    ],
+    "h2-archive": [],
 }
 
 

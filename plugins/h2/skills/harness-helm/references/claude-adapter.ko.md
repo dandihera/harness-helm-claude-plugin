@@ -19,7 +19,7 @@ Claude Code는 다음을 지원해야 합니다.
 - Slash command file은 thin alias입니다.
 - `.claude/skills/harness-helm/SKILL.md`가 runtime command guidance를 소유합니다.
 - `references/`는 compact runtime snapshot을 저장합니다.
-- `.harness-helm/h2-cartridge.yml`은 설치되어 있을 때 provider, surface, fallback, routing, registry 값을 소유합니다.
+- `.harness-helm/h2-cartridge.yml`은 설치되어 있을 때 provider, surface, fallback, routing, output language, registry 값을 소유합니다.
 
 ## Boundaries
 

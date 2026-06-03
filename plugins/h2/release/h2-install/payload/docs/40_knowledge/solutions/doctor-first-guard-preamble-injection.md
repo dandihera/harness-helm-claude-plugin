@@ -7,7 +7,7 @@ owner: 장태욱
 security: internal
 confidence: medium
 related:
-  - docs/_archive/2026-05/0530-004105_h2-plugin-claude-code/h2-plugin-claude-code.design.md
+  - docs/_archive/2026-05/0530-0041_h2-plugin-claude-code/h2-plugin-claude-code.design.md
   - docs/40_knowledge/learnings/plugin-target-command-collision-single-scope.md
   - docs/40_knowledge/learnings/multi-target-guard-single-signal.md
 module:

@@ -21,7 +21,7 @@
 - `h2-compound`: 재사용 가능한 지식을 축적합니다. low-risk `40_knowledge` learning/solution 문서는 검증 후 작성할 수 있고, governed canonical 후보는 승인 전까지 staging합니다.
 - `h2-archive`: 완료된 01-04 workflow artifact를 archive로 이동하고 완료된 feature run-root도 archive tooling으로 이동합니다. dry-run은 사용자가 preview-only 동작을 명시적으로 요청한 경우에만 사용합니다.
 - `h2-ops`: runbook, release, incident, branch cleanup 같은 운영 follow-up을 기록합니다.
-- `h2-cartridge`: provider, surface, fallback, routing mapping을 점검 또는 갱신합니다.
+- `h2-cartridge`: provider, surface, fallback, routing, output language mapping을 점검 또는 갱신합니다.
 
 ## 공통 출력
 

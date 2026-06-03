@@ -147,7 +147,7 @@ def command_cartridge_validate(args: argparse.Namespace) -> int:
         if tool.get("id") and tool.get("id") != tool_id:
             hard.append(f"external_tool_registry.tools.{tool_id}: id mismatch ({tool.get('id')}).")
 
-    required_command_fields = {"mode", "provider", "surface", "fallback_label", "routing_target"}
+    required_command_fields = {"mode", "provider", "surface", "fallback_label", "routing_target", "output_language"}
     missing_commands = sorted(EXPECTED_COMMANDS - set(commands))
     for command in missing_commands:
         hard.append(f"commands.{command}: missing command mapping.")

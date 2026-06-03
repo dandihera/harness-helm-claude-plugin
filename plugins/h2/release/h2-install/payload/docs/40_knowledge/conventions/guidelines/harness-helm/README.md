@@ -38,7 +38,8 @@ Target project에는 `cookbooks/`가 설치되지 않는다. 따라서 target ru
 - `workflow-lifecycle-commands.md`: h2 command lifecycle과 routing 기준
 - `context-pack-contract.md`: context pack의 역할, 출력 구조, preflight 관계
 - `runtime-folder-structure.md`: `.harness-helm/` runtime 폴더와 run staging 구조
-- `cartridge-command-mapping.md`: provider/surface/fallback/routing mapping 기준
+- `feature-naming.md`: GitHub/GitLab 이슈에서 시작한 h2 feature slug naming 기준
+- `cartridge-command-mapping.md`: provider/surface/fallback/routing/output language mapping 기준
 - `provider-surface-selection-and-override.md`: run-level provider/surface override와 permanent mapping change 기준
 - `cartridge-output-normalization.md`: upstream raw output을 h2 artifact로 정규화하는 기준
 - `compound-policy-config.md`: `h2-compound` write boundary와 review gate 기준
@@ -52,4 +53,3 @@ Target project에는 `cookbooks/`가 설치되지 않는다. 따라서 target ru
 - snapshot과 guideline이 충돌하면 guideline을 우선한다.
 - `.harness-helm/h2-cartridge.yml`, `.harness-helm/h2-schema.yml`, `.harness-helm/h2-compound.yml`이 실행 기준인 값은 문서에 중복 선언하지 않는다.
 - source-only 배경, issue trace, release 과정은 cookbook이나 workflow artifact에 남기고 target manual 본문 중심에 두지 않는다.
-

@@ -50,14 +50,14 @@ Technical identifier, command name, file path, frontmatter key, proper noun, sou
 2. canonical `h2-*` command semantics, output fields, staging rules, docs routing은 이 `SKILL.md`를 기준으로 한다.
 3. `.claude/commands/h2/*.md`는 얇은 slash command alias로만 취급한다.
 4. 자세한 criteria, parity evidence, upstream mapping, normalization, promotion rule이 필요할 때만 bundled `references/*.md`를 로드한다.
-5. 설치되어 있으면 `.harness-helm/h2-cartridge.yml`을 editable provider, surface, fallback, routing 값의 기준으로 사용한다. 없으면 `references/cartridge-command-mapping.md`는 invocation recording, fallback handling, routing invariant 확인에만 사용한다.
+5. 설치되어 있으면 `.harness-helm/h2-cartridge.yml`을 editable provider, surface, fallback, routing, output language 값의 기준으로 사용한다. 없으면 `references/cartridge-command-mapping.md`는 invocation recording, fallback handling, routing invariant 확인에만 사용한다.
 6. 설치되어 있으면 `.harness-helm/h2-compound.yml`을 h2-compound domain refinement, canonical destination, review gate, retrieval hook policy의 기준으로 사용한다. 없으면 built-in conservative default를 사용한다.
 
 ## Runtime Source Hierarchy
 
 - Source repository의 design record는 `cookbooks/`에 있지만, installed target project에는 `cookbooks/`가 없다.
 - Installed runtime command semantics는 이 `SKILL.md`, `references/core-workflow.md`, `references/workflow-lifecycle-commands.md`를 기준으로 한다.
-- Runtime provider/surface mapping은 설치된 `.harness-helm/h2-cartridge.yml`을 기준으로 한다. Bundled upstream reference는 cartridge 값 사본이 아니라 invocation recording, fallback handling, routing invariant fallback guidance다.
+- Runtime provider, surface, fallback, routing, output language mapping은 설치된 `.harness-helm/h2-cartridge.yml`을 기준으로 한다. Bundled upstream reference는 cartridge 값 사본이 아니라 invocation recording, fallback handling, routing invariant fallback guidance다.
 - Runtime h2-compound knowledge policy는 설치된 `.harness-helm/h2-compound.yml`을 기준으로 하며, 없으면 built-in conservative default를 fallback으로 사용한다.
 - Runtime schema validation은 `.harness-helm/h2-schema.yml`을 기준으로 한다.
 - Root `CLAUDE.md`와 `AGENTS.md`는 project-wide entrypoint guidance를 제공하며 full workflow contract를 중복 정의하지 않는다.
@@ -87,7 +87,7 @@ Claude Code는 다음 `h2-*` command를 제공해야 한다:
 - `h2-ops`
 - `h2-cartridge`
 
-`.harness-helm/h2-cartridge.yml`이 설치되어 있으면 provider, surface, fallback label, routing target 값과 external tool registry entry의 공통 기준으로 사용한다. target project에 이 파일이 없으면 bundled `references/cartridge-command-mapping.md`는 invocation recording, fallback handling, routing invariant 확인에만 사용한다. tool 대안과 registration rule은 `references/cartridge-tool-registry.md`, 자세한 workflow lifecycle command 의미가 필요하면 `references/workflow-lifecycle-commands.md`를 읽는다.
+`.harness-helm/h2-cartridge.yml`이 설치되어 있으면 provider, surface, fallback label, routing target, output language 값과 external tool registry entry의 공통 기준으로 사용한다. target project에 이 파일이 없으면 bundled `references/cartridge-command-mapping.md`는 invocation recording, fallback handling, routing invariant 확인에만 사용한다. tool 대안과 registration rule은 `references/cartridge-tool-registry.md`, 자세한 workflow lifecycle command 의미가 필요하면 `references/workflow-lifecycle-commands.md`를 읽는다.
 
 ## Common Input
 
@@ -107,6 +107,8 @@ constraints:
 ```
 
 Minimum input은 `command`, `feature`, `task`다. `h2-context`는 `feature: null`을 사용할 수 있으며, 이 경우 `.harness-helm/runs/_unscoped/{run-id}/`를 사용한다.
+
+이슈에서 시작한 feature명은 기본적으로 `<kebab-case-feature>_<issue-number>`를 사용한다. 예: `snapshot-archive-scope_124`. GitHub/GitLab 이슈에서 시작하지 않은 workflow는 suffix 없이 kebab-case feature slug만 사용한다. 예: `h2-run-stats`. Multi-provider project는 issue 번호 충돌을 피해야 할 때만 `_gh_` 또는 `_gl_`을 사용할 수 있다.
 
 ## Common Output
 
@@ -222,6 +224,7 @@ Recommended Markdown shape:
 - `code`, `qa`, `security`, `cross` review type을 지원한다.
 - review candidate를 `docs/03_review/{type}/{feature}.md`로 route한다.
 - Cross Review는 Cross Review policy criteria를 만족할 때만 실행한다.
+- 생성되는 리뷰 내용은 모두 한글로 작성한다. 기술 식별자, 커맨드명, 파일 경로, 인용 소스는 원문 형태를 유지한다.
 - `next.recommended_h2_step`을 `h2-report`로 설정한다.
 
 ### h2-report
@@ -250,7 +253,8 @@ Recommended Markdown shape:
 - `.harness-helm/scripts/harness archive {feature}`를 실행해 archive를 수행한다. 변경 사항을 적용하지 않고 미리보기만 하려면 `--dry-run`을 사용한다.
 - `h2-autorun` 안의 `h2-archive`는 preview 단계가 아니라 execute 단계다. 사용자가 lifecycle 자동 진행을 이미 요청했으므로 기본값은 non-dry-run archive다.
 - archive file movement를 재구현하지 않는다.
-- archive 완료 후 `.harness-helm/scripts/harness kb-index`를 실행해 `docs/_indexes/*.md`에 새 archive manifest 항목이 반영되도록 한다. 재생성된 index 파일을 archive와 같은 commit/PR에 포함한다. 누락하면 다음 push에서 `harness-validate`(또는 동등한 CI)가 index drift로 실패한다.
+- `harness archive`는 `.harness-helm/runs/{feature}/`를 `docs/_archive/{archive-folder}/runs/`로 이동하고 임시 `runs/stage-runtime-summary.json`을 쓴 뒤 archive root의 `stage-runtime-summary.md`를 생성한다. 이후 임시 JSON을 제거하고 각 run root의 Markdown 산출물(`context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, `compound-candidates.md` 등)만 남긴다. Run manifest, snapshot, raw, normalized, promotion candidate, restore backup은 summary 생성 후 제거된다.
+- archive 완료 후 `.harness-helm/scripts/harness kb-index`를 실행해 active docs가 indexed 위치에서 archive로 이동된 상태를 `docs/_indexes/*.md`에 반영한다. 재생성된 index 파일을 archive와 같은 commit/PR에 포함한다. 누락하면 다음 push에서 `harness-validate`(또는 동등한 CI)가 index drift로 실패한다.
 - `.harness-helm/runs/{feature}/{run-id}/archive-plan.md`로 route한다.
 - `next.recommended_h2_step`을 `h2-ops` 또는 `null`로 설정한다.
 
@@ -263,7 +267,7 @@ Recommended Markdown shape:
 ### h2-cartridge
 
 - `.harness-helm/`이 설치되어 있으면 `.harness-helm/scripts/harness cartridge-validate`를 실행하고, 없으면 bundled `references/cartridge-command-mapping.md`에서 invocation recording, fallback handling, routing invariant를 확인한다.
-- 각 command가 `provider`, `surface`, `fallback_label`, `routing_target`을 정의하는지 확인한다.
+- 각 command가 `provider`, `surface`, `fallback_label`, `routing_target`, `output_language`를 정의하는지 확인한다.
 - unavailable surface나 invalid surface는 `verification.not_verified` 또는 `verification.required`에 기록한다.
 - `.harness-helm/runs/{feature}/{run-id}/cartridge-mapping.md`로 route한다.
 
@@ -282,7 +286,7 @@ Recommended Markdown shape:
 - `feature`를 알 수 없으면 `.harness-helm/runs/_unscoped/{run-id}/`를 사용한다.
 - `run-id` format은 `Asia/Seoul` 기준 `YYYYMMDD-HHMMSS-h2-{command}`이며 harness script가 검증한다.
 - h2 command를 실행하는 runtime adapter가 `raw/`, `normalized/`, `promotion-candidates/`를 생성한다. `harness.py`는 검증하고 정리하지만 모든 lifecycle command마다 생성하지는 않는다.
-- `.harness-helm/runs/**`는 official KB가 아니며 default retrieval input도 아니다.
+- `.harness-helm/runs/**`는 official KB가 아니며 default retrieval input도 아니다. `h2-archive`에서는 feature runs folder를 `docs/_archive/{archive-folder}/runs/`로 이동한 뒤 run별 Markdown 산출물만 남기고, archive root의 `stage-runtime-summary.md`에 사람이 읽는 timing summary를 남긴다.
 - official docs로 옮기기 전에 sensitive/raw output을 제거하거나 mask한다.
 
 ## Upstream Override Input
