@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import re
 import shutil
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable, Sequence
 
 from . import paths
 from .frontmatter import list_value, parse_frontmatter, parse_simple_yaml
@@ -110,6 +114,205 @@ GUIDELINE_DERIVED_REFERENCE_HEADERS = {
 }
 REFERENCE_MAPPING_AUTHORITY = "docs/40_knowledge/conventions/guidelines/harness-helm/runtime-reference-selection.md"
 NORMALIZATION_FIXTURE_COMMANDS = {"h2-plan", "h2-design", "h2-report"}
+
+
+@dataclass(frozen=True)
+class ChangedPath:
+    path: Path
+    status: str
+
+
+def _repo_relative(path: Path, root: Path) -> Path:
+    if path.is_absolute():
+        return path.relative_to(root)
+    return path
+
+
+def _is_runtime_skill_path(path: Path) -> bool:
+    parts = path.parts
+    return len(parts) >= 3 and parts[0] in {".claude", ".codex"} and parts[1] == "skills"
+
+
+def runtime_translation_peer(path: Path) -> Path | None:
+    if not _is_runtime_skill_path(path):
+        return None
+    if path.name == "SKILL.md":
+        return path.with_name("SKILL.ko.md")
+    if path.name == "SKILL.ko.md":
+        return path.with_name("SKILL.md")
+    if path.parent.name != "references":
+        return None
+    if path.name.endswith(".ko.md"):
+        return path.with_name(path.name.removesuffix(".ko.md") + ".md")
+    if path.suffix == ".md":
+        return path.with_name(path.stem + ".ko.md")
+    return None
+
+
+def _changed_path_key(changed: ChangedPath) -> tuple[str, str]:
+    return (changed.path.as_posix(), changed.status)
+
+
+def changed_runtime_translation_pairs(
+    changed: Iterable[ChangedPath],
+    root: Path,
+) -> tuple[list[str], list[str]]:
+    hard: list[str] = []
+    warnings: list[str] = []
+    normalized = [
+        ChangedPath(_repo_relative(item.path, root), item.status)
+        for item in changed
+    ]
+    changed_by_path = {item.path.as_posix(): item for item in normalized}
+
+    for item in sorted(normalized, key=_changed_path_key):
+        peer = runtime_translation_peer(item.path)
+        if peer is None:
+            continue
+        peer_item = changed_by_path.get(peer.as_posix())
+        rel = item.path.as_posix()
+        peer_rel = peer.as_posix()
+        if peer_item is None:
+            if item.status == "added" and (root / peer).exists():
+                continue
+            hard.append(f"{rel}: runtime translation pair changed without {peer_rel}.")
+            continue
+        if item.status == "deleted" and peer_item.status != "deleted":
+            hard.append(f"{rel}: runtime translation pair deletion must also delete {peer_rel}.")
+        elif item.status != "deleted" and peer_item.status == "deleted":
+            hard.append(f"{rel}: runtime translation pair changed while {peer_rel} is deleted.")
+
+    return hard, warnings
+
+
+def _parse_name_status(stdout: str) -> list[ChangedPath]:
+    changed: list[ChangedPath] = []
+    for line in stdout.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        status_code = parts[0]
+        status = status_code[0]
+        if status == "D" and len(parts) >= 2:
+            changed.append(ChangedPath(Path(parts[1]), "deleted"))
+        elif status == "R" and len(parts) >= 3:
+            changed.append(ChangedPath(Path(parts[1]), "deleted"))
+            changed.append(ChangedPath(Path(parts[2]), "added"))
+        elif status in {"A", "C"} and len(parts) >= 2:
+            changed.append(ChangedPath(Path(parts[1]), "added"))
+        elif len(parts) >= 2:
+            changed.append(ChangedPath(Path(parts[1]), "modified"))
+    return changed
+
+
+def run_git_name_status(root: Path, args: Sequence[str]) -> tuple[list[ChangedPath], list[str]]:
+    try:
+        proc = subprocess.run(
+            ["git", *args],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return [], [f"git {' '.join(args)} failed: {exc}"]
+    if proc.returncode != 0:
+        reason = proc.stderr.strip() or proc.stdout.strip() or f"exit {proc.returncode}"
+        return [], [f"git {' '.join(args)} failed: {reason}"]
+    return _parse_name_status(proc.stdout), []
+
+
+def _run_git_untracked(root: Path) -> tuple[list[ChangedPath], list[str]]:
+    try:
+        proc = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return [], [f"git ls-files --others --exclude-standard failed: {exc}"]
+    if proc.returncode != 0:
+        reason = proc.stderr.strip() or proc.stdout.strip() or f"exit {proc.returncode}"
+        return [], [f"git ls-files --others --exclude-standard failed: {reason}"]
+    return [ChangedPath(Path(line), "added") for line in proc.stdout.splitlines() if line.strip()], []
+
+
+def _github_event_diff_args() -> list[str] | None:
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    if not event_path:
+        return None
+    try:
+        event = json.loads(Path(event_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    pull_request = event.get("pull_request")
+    if isinstance(pull_request, dict):
+        base = pull_request.get("base", {}).get("sha")
+        head = pull_request.get("head", {}).get("sha")
+        if base and head:
+            return ["diff", "--name-status", f"{base}...{head}"]
+    before = event.get("before")
+    after = event.get("after")
+    if before and after and not str(before).startswith("0000000"):
+        return ["diff", "--name-status", f"{before}..{after}"]
+    return None
+
+
+def collect_changed_files(root: Path) -> tuple[list[ChangedPath], list[str]]:
+    base_ref = os.environ.get("GITHUB_BASE_REF")
+    if base_ref:
+        changed, warnings = run_git_name_status(root, ["diff", "--name-status", f"origin/{base_ref}...HEAD"])
+        if not warnings:
+            return changed, []
+        event_args = _github_event_diff_args()
+        if event_args is not None:
+            changed, event_warnings = run_git_name_status(root, event_args)
+            if not event_warnings:
+                return changed, []
+    else:
+        event_args = _github_event_diff_args()
+        if event_args is not None:
+            changed, event_warnings = run_git_name_status(root, event_args)
+            if not event_warnings:
+                return changed, []
+
+    collected: list[ChangedPath] = []
+    warnings: list[str] = []
+    for args in (
+        ["diff", "--name-status", "HEAD"],
+        ["diff", "--cached", "--name-status"],
+    ):
+        changed, cmd_warnings = run_git_name_status(root, args)
+        collected.extend(changed)
+        warnings.extend(cmd_warnings)
+    changed, cmd_warnings = _run_git_untracked(root)
+    collected.extend(changed)
+    warnings.extend(cmd_warnings)
+
+    if warnings:
+        return [], warnings
+    deduped = sorted(set(collected), key=_changed_path_key)
+    return deduped, []
+
+
+def validate_runtime_skill_translation_files(root: Path) -> list[str]:
+    hard: list[str] = []
+    for skill_root in (root / ".claude" / "skills", root / ".codex" / "skills"):
+        if not skill_root.exists():
+            continue
+        for skill_path in sorted(skill_root.glob("**/SKILL.md")):
+            ko_path = skill_path.with_name("SKILL.ko.md")
+            if not ko_path.exists():
+                hard.append(f"{ko_path.relative_to(root).as_posix()}: missing Korean skill translation.")
+        for ko_path in sorted(skill_root.glob("**/SKILL.ko.md")):
+            skill_path = ko_path.with_name("SKILL.md")
+            if not skill_path.exists():
+                hard.append(f"{ko_path.relative_to(root).as_posix()}: Korean skill translation has no base SKILL.md.")
+    return hard
+
+
 def command_cartridge_validate(args: argparse.Namespace) -> int:
     hard: list[str] = []
     warnings: list[str] = []
@@ -162,6 +365,8 @@ def command_cartridge_validate(args: argparse.Namespace) -> int:
         "autorun-orchestrator",
         "snapshot-restore",
         "archive-checklist",
+        "harvest-inbox",
+        "harvest-tag",
         "ops-checklist",
         "codex-native-code-edit",
         "claude-native-code-edit",
@@ -247,6 +452,13 @@ def command_reference_validate(args: argparse.Namespace) -> int:
             if line.startswith("# "):
                 return line.strip()
         return None
+
+    hard.extend(validate_runtime_skill_translation_files(paths.ROOT))
+    changed, changed_warnings = collect_changed_files(paths.ROOT)
+    warnings.extend(changed_warnings)
+    changed_hard, changed_pair_warnings = changed_runtime_translation_pairs(changed, paths.ROOT)
+    hard.extend(changed_hard)
+    warnings.extend(changed_pair_warnings)
 
     for runtime, reference_root in runtime_roots.items():
         required = dict(REFERENCE_MANIFEST["shared"])

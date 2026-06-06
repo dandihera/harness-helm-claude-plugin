@@ -1,6 +1,6 @@
 ---
 name: harness-helm
-description: harness-helm h2 워크플로를 위한 Claude Code 어댑터. h2-context, h2-plan, h2-design, h2-autorun, h2-rewind, h2-analysis, h2-build, h2-test, h2-review, h2-report, h2-compound, h2-archive, h2-ops, h2-cartridge에 사용하며, 0301-core-workflow-spec의 command semantics, output fields, staging rules, docs routing을 보존한다.
+description: harness-helm h2 워크플로를 위한 Claude Code 어댑터. h2-context, h2-plan, h2-design, h2-autorun, h2-rewind, h2-analysis, h2-build, h2-test, h2-review, h2-report, h2-compound, h2-harvest, h2-archive, h2-ops, h2-cartridge에 사용하며, 0301-core-workflow-spec의 command semantics, output fields, staging rules, docs routing을 보존한다.
 ---
 
 # harness-helm
@@ -52,6 +52,7 @@ Technical identifier, command name, file path, frontmatter key, proper noun, sou
 4. 자세한 criteria, parity evidence, upstream mapping, normalization, promotion rule이 필요할 때만 bundled `references/*.md`를 로드한다.
 5. 설치되어 있으면 `.harness-helm/h2-cartridge.yml`을 editable provider, surface, fallback, routing, output language 값의 기준으로 사용한다. 없으면 `references/cartridge-command-mapping.md`는 invocation recording, fallback handling, routing invariant 확인에만 사용한다.
 6. 설치되어 있으면 `.harness-helm/h2-compound.yml`을 h2-compound domain refinement, canonical destination, review gate, retrieval hook policy의 기준으로 사용한다. 없으면 built-in conservative default를 사용한다.
+7. 설치되어 있으면 `.harness-helm/h2-harvest.yml`을 h2-harvest inbox curation policy의 기준으로 사용한다. 없으면 built-in conservative default를 사용한다.
 
 ## Runtime Source Hierarchy
 
@@ -59,6 +60,7 @@ Technical identifier, command name, file path, frontmatter key, proper noun, sou
 - Installed runtime command semantics는 이 `SKILL.md`, `references/core-workflow.md`, `references/workflow-lifecycle-commands.md`를 기준으로 한다.
 - Runtime provider, surface, fallback, routing, output language mapping은 설치된 `.harness-helm/h2-cartridge.yml`을 기준으로 한다. Bundled upstream reference는 cartridge 값 사본이 아니라 invocation recording, fallback handling, routing invariant fallback guidance다.
 - Runtime h2-compound knowledge policy는 설치된 `.harness-helm/h2-compound.yml`을 기준으로 하며, 없으면 built-in conservative default를 fallback으로 사용한다.
+- Runtime h2-harvest inbox curation policy는 설치된 `.harness-helm/h2-harvest.yml`을 기준으로 하며, 없으면 built-in conservative default를 fallback으로 사용한다.
 - Runtime schema validation은 `.harness-helm/h2-schema.yml`을 기준으로 한다.
 - Root `CLAUDE.md`와 `AGENTS.md`는 project-wide entrypoint guidance를 제공하며 full workflow contract를 중복 정의하지 않는다.
 
@@ -83,6 +85,7 @@ Claude Code는 다음 `h2-*` command를 제공해야 한다:
 - `h2-review`
 - `h2-report`
 - `h2-compound`
+- `h2-harvest`
 - `h2-archive`
 - `h2-ops`
 - `h2-cartridge`
@@ -94,7 +97,7 @@ Claude Code는 다음 `h2-*` command를 제공해야 한다:
 Claude Code invocation이 자연어 형태여도 다음 의미를 보존한다:
 
 ```yaml
-command: h2-context | h2-plan | h2-design | h2-autorun | h2-rewind | h2-analysis | h2-build | h2-test | h2-review | h2-report | h2-compound | h2-archive | h2-ops | h2-cartridge
+command: h2-context | h2-plan | h2-design | h2-autorun | h2-rewind | h2-analysis | h2-build | h2-test | h2-review | h2-report | h2-compound | h2-harvest | h2-archive | h2-ops | h2-cartridge
 feature: "<feature-slug or null>"
 task: "<user request or work summary>"
 source_request: "<original request, optional>"
@@ -246,6 +249,15 @@ Recommended Markdown shape:
 - governed 후보는 `routing.promotion_candidates`에 기록하고, low-risk 작성 결과는 `artifacts.created` 또는 `artifacts.updated`에 기록한다.
 - `.harness-helm/runs/{feature}/{run-id}/compound-candidates.md`로 route한다.
 - `next.recommended_h2_step`을 `h2-archive` 또는 `null`로 설정한다.
+
+### h2-harvest
+
+- `docs/_harvest-inbox/{solution,convention,domain,spec,decision,ops}/`에 staging된 메모를 정리한다.
+- 설치되어 있으면 `.harness-helm/scripts/harness h2-harvest`와 `.harness-helm/h2-harvest.yml`을 사용한다.
+- 본문만 보고 `confidence: high`를 추론하지 않는다. 사용자가 선언해야 하며 deterministic evidence metadata가 있어야 한다.
+- frontmatter가 type을 명시적으로 override하지 않은 경우 possible body/type mismatch는 warning으로만 처리한다.
+- report는 `.harness-helm/runs/_unscoped/{run-id}/harvest-report.md`로 route한다.
+- `next.recommended_h2_step`을 `null`로 설정한다.
 
 ### h2-archive
 

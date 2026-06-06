@@ -113,6 +113,39 @@ def artifact_stage_label(command: str | None, artifact: Path) -> str:
     return command_label
 
 
+def child_step_from_autorun_artifact(artifact: Path) -> str | None:
+    return {
+        "analysis": "h2-analysis",
+        "build": "h2-build",
+        "test": "h2-test",
+        "review": "h2-review",
+        "report": "h2-report",
+        "compound-candidates": "h2-compound",
+        "archive-plan": "h2-archive",
+    }.get(artifact.stem)
+
+
+def validate_autorun_timing_evidence(feature: str) -> list[str]:
+    errors: list[str] = []
+    runs_root = paths.ROOT / ".harness-helm" / "runs" / feature
+    if not runs_root.exists():
+        return errors
+    for run_dir in sorted(runs_root.glob("*-h2-autorun")):
+        if not run_dir.is_dir() or not paths.RUN_ID_PATTERN.match(run_dir.name):
+            continue
+        for artifact in sorted(run_dir.glob("*.md")):
+            step = child_step_from_autorun_artifact(artifact)
+            if step is None:
+                continue
+            manifest = run_dir / "snapshots" / step / "manifest.json"
+            if not manifest.exists():
+                errors.append(
+                    f"{artifact.relative_to(paths.ROOT).as_posix()}: missing autorun timing evidence "
+                    f"{manifest.relative_to(paths.ROOT).as_posix()}."
+                )
+    return errors
+
+
 def flattened_artifact_name(command: str | None, artifact: Path) -> str:
     label = artifact_stage_label(command, artifact)
     if artifact.name == "context-pack.md":
@@ -251,6 +284,12 @@ def command_archive(args: argparse.Namespace) -> int:
     if not sources:
         print(f"harness archive: no sources found for feature={feature}")
         return 1 if args.strict else 0
+    timing_errors = validate_autorun_timing_evidence(feature)
+    if timing_errors:
+        print("harness archive: missing h2-autorun timing evidence")
+        for error in timing_errors:
+            print(f"  {error}")
+        return 1
     print(f"harness archive: feature={feature}")
     for phase, src in sources:
         rel_dest = archive_destination(dest_root, phase, src)

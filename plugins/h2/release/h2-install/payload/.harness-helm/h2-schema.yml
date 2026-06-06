@@ -276,6 +276,8 @@ exclude_paths:
     - docs/50_operations/**/README.md
     # harness staging 산출물 템플릿은 정식 docs가 아니므로 제외
     - .harness-helm/runs/_templates/**
+    # h2-harvest inbox는 공식 docs가 되기 전 staging이며 approved/rejected 같은 임시 상태를 쓸 수 있으므로 제외
+    - docs/_harvest-inbox/**
 
 # ----------------------------------------------------------------------------
 # compound_policy_schema: .harness-helm/h2-compound.yml 검증 기준
@@ -383,3 +385,27 @@ compound_policy_schema:
     - applies_to
     - retrieval_triggers
     - related
+
+# ----------------------------------------------------------------------------
+# harvest_policy_schema: .harness-helm/h2-harvest.yml 검증 기준
+# ----------------------------------------------------------------------------
+# h2-harvest.yml은 workflow 산출물 기반 h2-compound.yml과 독립된 inbox 기반
+# 지식 정리 정책이다. docs/_harvest-inbox/** 파일은 공식 docs가 아니므로
+# lint/index에서 제외되고, 승격 후 목적지 문서만 일반 frontmatter schema를 따른다.
+harvest_policy_schema:
+  schema_versions:
+    - 1
+  destination_keys:
+    - solution
+    - convention
+    - domain
+    - spec
+    - decision
+    - runbook
+  subfolder_keys:
+    - solution
+    - convention
+    - domain
+    - spec
+    - decision
+    - ops

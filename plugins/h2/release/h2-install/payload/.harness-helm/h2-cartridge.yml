@@ -1,7 +1,7 @@
 # ============================================================================
 # harness-helm h2 cartridge mapping (Single Source of Truth)
 # ============================================================================
-# 이 파일은 14개 `h2-*` command 각각이 어떤 upstream provider/surface를
+# 이 파일은 15개 `h2-*` command 각각이 어떤 upstream provider/surface를
 # 호출하고, 호출 실패 시 어떤 fallback label과 routing target을 쓸지 정의한다.
 #
 # 소스 cookbook (변경 시 본 파일과 함께 갱신):
@@ -213,7 +213,7 @@ external_tool_registry:
 
 
 # ============================================================================
-# commands: 14개 h2-* command별 실행 매핑
+# commands: 15개 h2-* command별 실행 매핑
 # ============================================================================
 # 각 command는 아래 7개 필드로 정의된다.
 #   mode             command의 실행 모드 (context-pack/cartridge/recorder/validator 등)
@@ -402,6 +402,32 @@ commands:
       - gstack-document-release
     fallback_label: verified-fallback:knowledge-compounding-checklist
     routing_target: .harness-helm/runs/{feature}/{run-id}/compound-candidates.md
+    output_language: korean
+
+  # --------------------------------------------------------------------------
+  # h2-harvest: docs/_harvest-inbox 입력을 공식 기준 문서 위치로 변환한다.
+  # feature lifecycle과 독립적인 knowledge curation command라 _unscoped run report를 쓴다.
+  # --------------------------------------------------------------------------
+  h2-harvest:
+    mode: knowledge-curation
+    provider: harness
+    surface: harvest-inbox
+    alternatives: []
+    fallback_label: cartridge-checklist-fallback:harvest-inbox-checklist
+    routing_target: .harness-helm/runs/_unscoped/{run-id}/harvest-report.md
+    output_language: korean
+
+  # --------------------------------------------------------------------------
+  # h2-harvest-tag: raw inbox 입력을 LLM-assisted prefix 제안으로 전처리한다.
+  # 실제 파일 적용은 harness CLI가 담당하고, LLM 판별은 runtime skill surface가 담당한다.
+  # --------------------------------------------------------------------------
+  h2-harvest-tag:
+    mode: knowledge-curation
+    provider: harness
+    surface: harvest-tag
+    alternatives: []
+    fallback_label: cartridge-checklist-fallback:harvest-tag-checklist
+    routing_target: .harness-helm/runs/_unscoped/{run-id}/harvest-tag-report.md
     output_language: korean
 
   # --------------------------------------------------------------------------

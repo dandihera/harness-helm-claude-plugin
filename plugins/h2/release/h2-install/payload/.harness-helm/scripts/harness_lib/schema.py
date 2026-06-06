@@ -36,6 +36,41 @@ DEFAULT_COMPOUND_POLICY: dict[str, Any] = {
         "enforcement": "warn",
     },
 }
+DEFAULT_HARVEST_POLICY: dict[str, Any] = {
+    "schema_version": 1,
+    "canonical_destination": {
+        "solution": "docs/40_knowledge/solutions",
+        "convention": "docs/40_knowledge/conventions",
+        "domain": "docs/10_domain",
+        "spec": "docs/20_specs",
+        "decision": "docs/30_decisions",
+        "runbook": "docs/50_operations",
+    },
+    "review_gate": {
+        "low_risk_auto_write": True,
+        "governed_require_approval": True,
+        "confidence_threshold": "high",
+    },
+    "staging": {
+        "path": "docs/_harvest-inbox",
+        "type_by_subfolder": {
+            "solution": "solution",
+            "convention": "convention",
+            "domain": "domain",
+            "spec": "spec",
+            "decision": "decision",
+            "ops": "runbook",
+        },
+    },
+    "promoted_status": {
+        "solution": "verified",
+        "convention": "verified",
+        "decision": "accepted",
+        "spec": "stable",
+        "domain": "stable",
+        "runbook": "active",
+    },
+}
 
 
 def excluded_patterns(schema: dict[str, Any], key: str = "lint_index") -> list[str]:
@@ -92,6 +127,7 @@ def load_schema() -> dict[str, Any]:
             "stale_days": raw.get("stale_days", {}),
             "exclude_paths": raw.get("exclude_paths", {}),
             "compound_policy_schema": raw.get("compound_policy_schema", {}),
+            "harvest_policy_schema": raw.get("harvest_policy_schema", {}),
         }
 
     return {
@@ -167,6 +203,11 @@ def load_schema() -> dict[str, Any]:
             "enforcement": ["warn", "error"],
             "retrieval_hook_fields": ["domain", "module", "tags", "applies_to", "retrieval_triggers", "related"],
         },
+        "harvest_policy_schema": {
+            "schema_versions": [1],
+            "destination_keys": ["solution", "convention", "domain", "spec", "decision", "runbook"],
+            "subfolder_keys": ["solution", "convention", "domain", "spec", "decision", "ops"],
+        },
     }
 
 
@@ -187,6 +228,91 @@ def load_compound_policy(schema: dict[str, Any]) -> tuple[dict[str, Any], str, l
     raw = parse_simple_yaml(read_text(paths.COMPOUND_POLICY_PATH))
     policy = deep_merge(DEFAULT_COMPOUND_POLICY, raw)
     return policy, ".harness-helm/h2-compound.yml", validate_compound_policy(policy, schema)
+
+
+def load_harvest_policy(schema: dict[str, Any]) -> tuple[dict[str, Any], str, list[str]]:
+    if not paths.HARVEST_POLICY_PATH.exists():
+        return copy.deepcopy(DEFAULT_HARVEST_POLICY), "built-in-default", []
+
+    raw = parse_simple_yaml(read_text(paths.HARVEST_POLICY_PATH))
+    policy = deep_merge(DEFAULT_HARVEST_POLICY, raw)
+    return policy, ".harness-helm/h2-harvest.yml", validate_harvest_policy(policy, schema)
+
+
+def validate_harvest_policy(policy: dict[str, Any], schema: dict[str, Any]) -> list[str]:
+    warnings: list[str] = []
+    policy_schema = schema.get("harvest_policy_schema", {})
+    versions = set(list_value(policy_schema.get("schema_versions", [1])))
+    destination_keys = set(
+        list_value(
+            policy_schema.get(
+                "destination_keys",
+                ["solution", "convention", "domain", "spec", "decision", "runbook"],
+            )
+        )
+    )
+    subfolder_keys = set(
+        list_value(
+            policy_schema.get(
+                "subfolder_keys",
+                ["solution", "convention", "domain", "spec", "decision", "ops"],
+            )
+        )
+    )
+
+    version = str(policy.get("schema_version"))
+    if version not in versions:
+        warnings.append(f".harness-helm/h2-harvest.yml: unsupported schema_version={version}.")
+
+    destinations = policy.get("canonical_destination", {})
+    if not isinstance(destinations, dict):
+        warnings.append(".harness-helm/h2-harvest.yml: canonical_destination must be a mapping.")
+        destinations = {}
+    for key, value in destinations.items():
+        if key not in destination_keys:
+            warnings.append(f".harness-helm/h2-harvest.yml: unknown canonical_destination key={key}.")
+        if key not in schema.get("type", set()):
+            warnings.append(f".harness-helm/h2-harvest.yml: canonical_destination key is not docs type={key}.")
+        if not isinstance(value, str) or paths.has_path_escape(value):
+            warnings.append(f".harness-helm/h2-harvest.yml: invalid canonical_destination.{key}={value}.")
+
+    staging = policy.get("staging", {})
+    if not isinstance(staging, dict):
+        warnings.append(".harness-helm/h2-harvest.yml: staging must be a mapping.")
+        staging = {}
+    staging_path = staging.get("path")
+    if not isinstance(staging_path, str) or paths.has_path_escape(staging_path):
+        warnings.append(f".harness-helm/h2-harvest.yml: invalid staging.path={staging_path}.")
+    subfolders = staging.get("type_by_subfolder", {})
+    if not isinstance(subfolders, dict):
+        warnings.append(".harness-helm/h2-harvest.yml: staging.type_by_subfolder must be a mapping.")
+        subfolders = {}
+    for key, value in subfolders.items():
+        if key not in subfolder_keys:
+            warnings.append(f".harness-helm/h2-harvest.yml: unknown staging.type_by_subfolder key={key}.")
+        if value not in destinations:
+            warnings.append(f".harness-helm/h2-harvest.yml: unknown type_by_subfolder.{key}={value}.")
+
+    promoted = policy.get("promoted_status", {})
+    if not isinstance(promoted, dict):
+        warnings.append(".harness-helm/h2-harvest.yml: promoted_status must be a mapping.")
+        promoted = {}
+    for key, value in promoted.items():
+        if key not in destinations:
+            warnings.append(f".harness-helm/h2-harvest.yml: unknown promoted_status key={key}.")
+        if value not in schema.get("status", set()):
+            warnings.append(f".harness-helm/h2-harvest.yml: invalid promoted_status.{key}={value}.")
+
+    review_gate = policy.get("review_gate", {})
+    if not isinstance(review_gate, dict):
+        warnings.append(".harness-helm/h2-harvest.yml: review_gate must be a mapping.")
+        review_gate = {}
+    threshold = str(review_gate.get("confidence_threshold", "high"))
+    if threshold not in schema.get("confidence", set()):
+        warnings.append(f".harness-helm/h2-harvest.yml: invalid review_gate.confidence_threshold={threshold}.")
+    if review_gate.get("governed_require_approval") is False:
+        warnings.append(".harness-helm/h2-harvest.yml: governed_require_approval=false is accepted but Phase 1 keeps governed types pending.")
+    return warnings
 
 
 def validate_compound_policy(policy: dict[str, Any], schema: dict[str, Any]) -> list[str]:

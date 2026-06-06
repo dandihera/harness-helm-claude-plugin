@@ -87,6 +87,8 @@ EXPECTED_COMMANDS = {
     "h2-compound",
     "h2-archive",
     "h2-ops",
+    "h2-harvest",
+    "h2-harvest-tag",
 }
 
 
@@ -356,8 +358,76 @@ def iter_archive_run_dirs(archive_path: Path) -> list[Path]:
         for path in runs.iterdir()
         if path.is_dir()
         and paths.RUN_ID_PATTERN.match(path.name)
-        and ((path / RUN_MANIFEST_NAME).exists() or (path / "manifest.md").exists() or (path / "context-pack.md").exists())
+        and (
+            (path / RUN_MANIFEST_NAME).exists()
+            or (path / "manifest.md").exists()
+            or (path / "context-pack.md").exists()
+            or any(path.glob("*.md"))
+        )
     )
+
+
+def command_from_markdown_artifact(path: Path) -> str | None:
+    try:
+        frontmatter, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+    except OSError:
+        frontmatter = {}
+    command = frontmatter.get("command")
+    if isinstance(command, str) and command in SNAPSHOT_STAGE_COMMANDS | {"h2-autorun"}:
+        return command
+    return {
+        "build": "h2-build",
+        "test": "h2-test",
+        "review": "h2-review",
+        "report": "h2-report",
+        "compound-candidates": "h2-compound",
+        "archive-plan": "h2-archive",
+    }.get(path.stem)
+
+
+def build_markdown_stage_entries(run_dir: Path, feature_override: str | None = None) -> list[RunStatsEntry]:
+    try:
+        parent_command = command_from_run_id(run_dir.name)
+    except ValueError:
+        return []
+    if parent_command != "h2-autorun":
+        return []
+    artifacts: list[tuple[Path, str, dt.datetime]] = []
+    for path in sorted(run_dir.glob("*.md")):
+        command = command_from_markdown_artifact(path)
+        if command not in SNAPSHOT_STAGE_COMMANDS:
+            continue
+        completed_at = dt.datetime.fromtimestamp(path.stat().st_mtime, tz=dt.timezone(dt.timedelta(hours=9)))
+        artifacts.append((path, command, completed_at))
+    if not artifacts:
+        return []
+    artifacts.sort(key=lambda item: (item[2], item[1]))
+    feature = feature_override or run_dir.parent.name
+    previous = started_at_from_run_id(run_dir.name)
+    entries: list[RunStatsEntry] = []
+    for path, command, completed_at in artifacts:
+        started_at = previous
+        elapsed = max(0, int((completed_at - started_at).total_seconds()))
+        entries.append(
+            RunStatsEntry(
+                feature=feature,
+                run_id=f"{run_dir.name}/{command}",
+                command=command,
+                status="recorded-estimated",
+                started_at=started_at,
+                completed_at=completed_at,
+                elapsed_seconds=elapsed,
+                manifest_path=None,
+                warnings=[
+                    f"{path.name}: elapsed estimated from markdown artifact mtime because manifest metadata is missing"
+                ],
+                autorun_id=run_dir.name,
+                invoked_surface=cartridge_fallback_surface(command),
+                invocation_mode="fallback" if cartridge_fallback_surface(command) else "unknown",
+            )
+        )
+        previous = completed_at
+    return entries
 
 
 def iter_archive_snapshot_stage_manifests(archive_path: Path) -> list[Path]:
@@ -586,9 +656,13 @@ def build_archive_runtime_summary(archive_path: Path, generated_at: dt.datetime 
         build_snapshot_stage_entry(path, feature_override=feature)
         for path in iter_archive_snapshot_stage_manifests(archive_path)
     ]
-    entries = direct_entries + snapshot_entries
+    markdown_stage_entries: list[RunStatsEntry] = []
+    if not snapshot_entries:
+        for path in iter_archive_run_dirs(archive_path):
+            markdown_stage_entries.extend(build_markdown_stage_entries(path, feature_override=feature))
+    entries = direct_entries + snapshot_entries + markdown_stage_entries
     entries.sort(key=latest_activity)
-    if snapshot_entries:
+    if snapshot_entries or markdown_stage_entries:
         total_entries = [entry for entry in entries if entry.command != "h2-autorun"]
     else:
         total_entries = entries

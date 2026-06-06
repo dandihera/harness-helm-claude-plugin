@@ -8,6 +8,8 @@ import sys
 
 from harness_lib.archive import command_archive, command_cleanup_runs
 from harness_lib.context import command_context
+from harness_lib.harvest import command_harvest
+from harness_lib.harvest_tag import command_harvest_tag
 from harness_lib.index import command_index, command_stale
 from harness_lib.install import command_install
 from harness_lib.lint import command_lint
@@ -26,7 +28,7 @@ from harness_lib.validation import (
 LOG_START = "=== [DANDI] :: Harness Helm (_start_) ==="
 LOG_END = "=== [DANDI] :: Harness Helm (__end__) ==="
 # This list is the cartridge/reference validation surface, not a 1:1 list of
-# local CLI subcommands. Only h2-context is directly implemented by harness.py.
+# local CLI subcommands. h2-context and h2-harvest are directly implemented by harness.py.
 EXPECTED_COMMANDS = {
     "h2-context",
     "h2-plan",
@@ -42,9 +44,11 @@ EXPECTED_COMMANDS = {
     "h2-compound",
     "h2-archive",
     "h2-ops",
+    "h2-harvest",
+    "h2-harvest-tag",
 }
 H2_CLI_NOTE = (
-    "Note: among the h2-* lifecycle commands, only h2-context is directly "
+    "Note: among the h2-* lifecycle commands, h2-context and h2-harvest are directly "
     "implemented by this CLI. Use .claude/commands/h2/*, the Codex h2 skill, "
     "or .harness-helm/h2-cartridge.yml mappings for the other h2-* commands."
 )
@@ -98,6 +102,23 @@ def build_parser() -> argparse.ArgumentParser:
     context.add_argument("--autorun-id")
     context.add_argument("--dry-run", action="store_true")
     context.set_defaults(func=command_context)
+
+    harvest = sub.add_parser("h2-harvest")
+    harvest_group = harvest.add_mutually_exclusive_group()
+    harvest_group.add_argument("--promote")
+    harvest_group.add_argument("--reject")
+    harvest.add_argument("--run-id")
+    harvest.add_argument("--dry-run", action="store_true")
+    harvest.add_argument("--force", action="store_true")
+    harvest.add_argument("--skip-raw", action="store_true")
+    harvest.set_defaults(func=command_harvest)
+
+    harvest_tag = sub.add_parser("h2-harvest-tag")
+    harvest_tag.add_argument("--classification-json")
+    harvest_tag.add_argument("--run-id")
+    harvest_tag.add_argument("--dry-run", action="store_true")
+    harvest_tag.add_argument("--autorun", action="store_true")
+    harvest_tag.set_defaults(func=command_harvest_tag)
 
     run_mark = sub.add_parser("run-mark")
     run_mark_sub = run_mark.add_subparsers(dest="run_mark_action", required=True)

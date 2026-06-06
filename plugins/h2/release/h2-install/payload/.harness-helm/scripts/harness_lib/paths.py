@@ -9,6 +9,7 @@ DOCS = ROOT / "docs"
 SCHEMA_PATH = ROOT / ".harness-helm" / "h2-schema.yml"
 CARTRIDGE_PATH = ROOT / ".harness-helm" / "h2-cartridge.yml"
 COMPOUND_POLICY_PATH = ROOT / ".harness-helm" / "h2-compound.yml"
+HARVEST_POLICY_PATH = ROOT / ".harness-helm" / "h2-harvest.yml"
 
 RUN_ID_PATTERN = re.compile(r"^\d{8}-\d{6}-h2-[a-z][a-z0-9-]*$")
 
@@ -56,4 +57,3 @@ def repository_rel(path: Path) -> str:
 
 def display_path(path: Path) -> str:
     return repository_rel(path)
-

@@ -1,0 +1,120 @@
+# ============================================================================
+# harness-helm h2-harvest 정책 파일
+# ============================================================================
+#
+# [역할]
+# h2-harvest 명령이 docs/_harvest-inbox 에 들어온 문서를 어떤 공식 기준
+# 문서 위치로 변환할지 정의한다.
+#
+# [h2-compound.yml과의 관계]
+# h2-compound.yml은 완료된 h2 workflow 산출물에서 반복 가능한 지식을
+# 뽑아 축적한다. 이 파일은 그와 독립된 inbox 기반 지식 정리 정책이다.
+# 공통 schema helper는 재사용할 수 있지만 두 파일의 policy key를 섞지 않는다.
+#
+# [수정 시 주의]
+# canonical_destination 키를 추가/변경하면 staging.type_by_subfolder와
+# promoted_status도 함께 맞춰야 한다. 세 블록이 동일한 type 집합을 참조한다.
+# ============================================================================
+
+# 이 파일의 구조 버전. 파서 호환성 확인에 사용한다.
+schema_version: 1
+
+# ---------------------------------------------------------------------------
+# canonical_destination
+# ---------------------------------------------------------------------------
+# inbox 파일이 승격될 때 이동하는 공식 기준 문서 경로를 type별로 정의한다.
+# 키: h2-schema.yml에 등록된 type 값
+# 값: repository root 기준 상대 경로 (trailing slash 없음)
+#
+# 지원 type 요약:
+#   solution   — 문제/해결/검증 패턴이 명확한 재사용 가능한 노하우
+#   convention — 팀 규칙, 가이드라인, 네이밍 규칙
+#   domain     — 개념 정의, 용어 사전, 도메인 지식
+#   spec       — 명세, 요구사항, API/schema 계약
+#   decision   — 아키텍처 결정 기록 (ADR)
+#   runbook    — 운영 절차, 인시던트 대응, 릴리즈 절차
+# ---------------------------------------------------------------------------
+canonical_destination:
+  solution: docs/40_knowledge/solutions
+  convention: docs/40_knowledge/conventions
+  domain: docs/10_domain
+  spec: docs/20_specs
+  decision: docs/30_decisions
+  runbook: docs/50_operations
+
+# ---------------------------------------------------------------------------
+# review_gate
+# ---------------------------------------------------------------------------
+# 파일을 즉시 승격(auto-write)할지, 사용자 승인을 요구할지 결정하는 정책이다.
+#
+# low_risk_auto_write:
+#   true  — solution/convention 중 confidence_threshold 조건을 만족하면
+#            즉시 목적지로 이동한다.
+#   false — 모든 파일을 pending으로 처리한다.
+#
+# governed_require_approval:
+#   true  — domain/spec/decision/runbook(governed type)은 사용자 명시 승인
+#            전까지 항상 pending으로 유지한다.
+#   false — schema상 허용하지만 Phase 1 구현에서는 지원하지 않는다.
+#            false로 설정해도 warning을 내고 governed type을 pending으로 유지한다.
+#            governed type 자동 승격은 Phase 2 이후 검토 대상이다.
+#
+# confidence_threshold:
+#   auto-write 대상 판별 기준. 현재 허용값: high
+#   high 조건(모두 충족해야 함):
+#     1. frontmatter에 confidence: high 선언
+#     2. h2-schema.yml의 confidence_high_evidence_fields 중 하나 이상 존재
+#     3. 목적지 동일 파일명 overlap 없음 (또는 --force 사용)
+#     4. 필수 frontmatter 주입 결과가 schema enum을 만족
+# ---------------------------------------------------------------------------
+review_gate:
+  low_risk_auto_write: true
+  governed_require_approval: true
+  confidence_threshold: high
+
+# ---------------------------------------------------------------------------
+# staging
+# ---------------------------------------------------------------------------
+# inbox 경로와 하위 폴더 → type 매핑을 정의한다.
+#
+# path:
+#   inbox 루트 경로. 이 경로 외부의 파일은 h2-harvest가 처리하지 않는다.
+#   h2-schema.yml의 exclude_paths.lint_index에도 동일 경로가 등록되어
+#   lint/index 검사 대상에서 제외된다.
+#
+# type_by_subfolder:
+#   하위 폴더명 → type 매핑. 파일 frontmatter에 type: 이 있으면 이 매핑보다
+#   frontmatter 값을 우선한다. 단 frontmatter의 type이 canonical_destination
+#   키에 없으면 hard error로 처리한다.
+#   주의: ops/ 폴더는 runbook type으로 매핑된다. 폴더명과 type이 다른 유일한 케이스.
+# ---------------------------------------------------------------------------
+staging:
+  path: docs/_harvest-inbox
+  type_by_subfolder:
+    solution: solution
+    convention: convention
+    domain: domain
+    spec: spec
+    decision: decision
+    ops: runbook
+
+# ---------------------------------------------------------------------------
+# promoted_status
+# ---------------------------------------------------------------------------
+# 파일이 목적지로 이동된 후 frontmatter의 status 필드에 적용할 값을 type별로 정의한다.
+# inbox 내부에서 사용하는 임시 승인 상태(approved)와 다르다.
+# 목적지 canonical 문서에는 반드시 여기 정의된 값만 사용한다.
+#
+# 각 값의 의미:
+#   verified — 검증 완료된 실용 지식 (solution, convention)
+#   accepted — 공식 채택된 결정 기록 (decision)
+#   stable   — 안정된 참조 문서 (spec, domain)
+#   active   — 현재 유효한 운영 절차 (runbook)
+# ---------------------------------------------------------------------------
+promoted_status:
+  solution: verified
+  convention: verified
+  decision: accepted
+  spec: stable
+  domain: stable
+  runbook: active

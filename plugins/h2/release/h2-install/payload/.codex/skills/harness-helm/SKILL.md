@@ -1,6 +1,6 @@
 ---
 name: harness-helm
-description: Codex adapter for harness-helm h2 workflows. Use for $h2 context, $h2 plan, $h2 design, $h2 autorun, $h2 rewind, $h2 analysis, $h2 build, $h2 test, $h2 review, $h2 report, $h2 compound, $h2 archive, $h2 ops, and $h2 cartridge while preserving the 0301-core-workflow-spec command semantics, output fields, staging rules, and docs routing.
+description: Codex adapter for harness-helm h2 workflows. Use for $h2 context, $h2 plan, $h2 design, $h2 autorun, $h2 rewind, $h2 analysis, $h2 build, $h2 test, $h2 review, $h2 report, $h2 compound, $h2 harvest, $h2 archive, $h2 ops, and $h2 cartridge while preserving the 0301-core-workflow-spec command semantics, output fields, staging rules, and docs routing.
 ---
 
 # harness-helm
@@ -51,6 +51,7 @@ Keep technical identifiers, command names, file paths, frontmatter keys, proper 
 4. Load bundled `references/*.md` only when detailed criteria, parity evidence, upstream mapping, normalization, or promotion rules are needed.
 5. Use `.harness-helm/h2-cartridge.yml` for editable provider, surface, fallback, routing, and output language values when installed; otherwise use `references/cartridge-command-mapping.md` only for invocation recording, fallback handling, and routing invariants.
 6. Use `.harness-helm/h2-compound.yml` for h2-compound domain refinement, canonical destination, review gate, and retrieval hook policy when installed; if absent, use built-in conservative defaults.
+7. Use `.harness-helm/h2-harvest.yml` for h2-harvest inbox curation policy when installed; if absent, use built-in conservative defaults.
 
 ## Runtime Source Hierarchy
 
@@ -58,6 +59,7 @@ Keep technical identifiers, command names, file paths, frontmatter keys, proper 
 - Installed runtime command semantics come from this `SKILL.md`, `references/core-workflow.md`, and `references/workflow-lifecycle-commands.md`.
 - Runtime provider, surface, fallback, routing, and output language mapping comes from `.harness-helm/h2-cartridge.yml` when installed. Bundled upstream references are fallback guidance for invocation recording, fallback handling, and routing invariants, not cartridge value copies.
 - Runtime h2-compound knowledge policy comes from `.harness-helm/h2-compound.yml` when installed, with built-in conservative defaults as fallback.
+- Runtime h2-harvest inbox curation policy comes from `.harness-helm/h2-harvest.yml` when installed, with built-in conservative defaults as fallback.
 - Runtime schema validation comes from `.harness-helm/h2-schema.yml`.
 - Root `AGENTS.md` provides project-wide entrypoint guidance and must not duplicate the full workflow contract.
 
@@ -100,6 +102,7 @@ Codex must provide these `h2-*` user invocations:
 - `$h2 review`
 - `$h2 report`
 - `$h2 compound`
+- `$h2 harvest`
 - `$h2 archive`
 - `$h2 ops`
 - `$h2 cartridge`
@@ -117,6 +120,7 @@ Internal canonical command ids:
 - `h2-review`
 - `h2-report`
 - `h2-compound`
+- `h2-harvest`
 - `h2-archive`
 - `h2-ops`
 - `h2-cartridge`
@@ -128,7 +132,7 @@ Use `.harness-helm/h2-cartridge.yml` as the shared source of truth for provider,
 Preserve these meanings even if Codex invocation is natural language:
 
 ```yaml
-command: h2-context | h2-plan | h2-design | h2-autorun | h2-rewind | h2-analysis | h2-build | h2-test | h2-review | h2-report | h2-compound | h2-archive | h2-ops | h2-cartridge
+command: h2-context | h2-plan | h2-design | h2-autorun | h2-rewind | h2-analysis | h2-build | h2-test | h2-review | h2-report | h2-compound | h2-harvest | h2-archive | h2-ops | h2-cartridge
 feature: "<feature-slug or null>"
 task: "<user request or work summary>"
 source_request: "<original request, optional>"
@@ -280,6 +284,15 @@ Recommended Markdown shape:
 - Record governed candidates in `routing.promotion_candidates`; record low-risk writes in `artifacts.created` or `artifacts.updated`.
 - Route to `.harness-helm/runs/{feature}/{run-id}/compound-candidates.md`.
 - Set `next.recommended_h2_step` to `h2-archive` or `null`.
+
+### h2-harvest
+
+- Curate staged notes from `docs/_harvest-inbox/{solution,convention,domain,spec,decision,ops}/`.
+- Use `.harness-helm/scripts/harness h2-harvest` and `.harness-helm/h2-harvest.yml` when installed.
+- Do not infer `confidence: high` from prose. It must be user-declared and supported by deterministic evidence metadata.
+- Treat possible body/type mismatch as warning-only unless frontmatter explicitly overrides the type.
+- Route reports to `.harness-helm/runs/_unscoped/{run-id}/harvest-report.md`.
+- Set `next.recommended_h2_step` to `null`.
 
 ### h2-archive
 

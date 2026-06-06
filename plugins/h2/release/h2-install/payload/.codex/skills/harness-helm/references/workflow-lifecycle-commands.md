@@ -19,6 +19,8 @@ This file defines command meaning and routing. It does not choose upstream provi
 - `h2-review`: record review findings and route to `docs/03_review/{type}/{feature}.md`.
 - `h2-report`: summarize lifecycle results and route to `docs/04_report/{feature}.md`.
 - `h2-compound`: compound reusable knowledge and stage governed canonical promotion candidates.
+- `h2-harvest`: curate `docs/_harvest-inbox/**` notes into canonical docs and route the report to `.harness-helm/runs/_unscoped/{run-id}/harvest-report.md`.
+- `h2-harvest-tag`: classify `docs/_harvest-inbox/raw/**` files into prefixed raw suggestions or typed inbox folders and route the report to `.harness-helm/runs/_unscoped/{run-id}/harvest-tag-report.md`.
 - `h2-archive`: check for h2-compound run evidence as preflight (auto-trigger if absent); then execute archive movement for completed 01-04 workflow artifacts and the completed feature run-root through archive tooling. Use dry-run only when the user explicitly asks for preview-only behavior.
 - `h2-ops`: record operational follow-up candidates.
 - `h2-cartridge`: inspect or update cartridge mappings.

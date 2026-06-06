@@ -7,7 +7,7 @@ from pathlib import Path
 from .docs import Doc, is_archive, is_excluded, is_index, load_docs
 from .frontmatter import list_value
 from .index import INDEX_DOMAIN, INDEX_KB, INDEX_TAG
-from .schema import decision_suffix, generated_header_ok, load_compound_policy, load_schema, validate_doc_id
+from .schema import decision_suffix, generated_header_ok, load_compound_policy, load_harvest_policy, load_schema, validate_doc_id
 from .utils import print_report
 
 
@@ -148,9 +148,10 @@ def validate_jsonl_indexes(hard: list[str]) -> None:
 def command_lint(args: argparse.Namespace) -> int:
     schema = load_schema()
     compound_policy, _compound_policy_source, compound_warnings = load_compound_policy(schema)
+    _harvest_policy, _harvest_policy_source, harvest_warnings = load_harvest_policy(schema)
     docs = load_docs()
     hard: list[str] = []
-    warnings: list[str] = list(compound_warnings)
+    warnings: list[str] = list(compound_warnings) + list(harvest_warnings)
     ids: dict[str, str] = {}
     retrieval_required = list_value(
         compound_policy.get("retrieval_hook_policy", {}).get("required", [])

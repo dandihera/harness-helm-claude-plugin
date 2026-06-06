@@ -15,7 +15,7 @@
 
 ## Required h2 Commands
 
-`h2-context`, `h2-plan`, `h2-design`, `h2-autorun`, `h2-rewind`, `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, `h2-archive`, `h2-ops`, `h2-cartridge`.
+`h2-context`, `h2-plan`, `h2-design`, `h2-autorun`, `h2-rewind`, `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, `h2-harvest`, `h2-archive`, `h2-ops`, `h2-cartridge`.
 
 ## Boundaries
 

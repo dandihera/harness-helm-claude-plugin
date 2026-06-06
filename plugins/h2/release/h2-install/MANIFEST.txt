@@ -15,6 +15,7 @@
 #   - docs/10_domain ~ docs/50_operations는 source-only 제외 규칙을 거쳐 하위 tree를 seed한다.
 #   - harness-helm runtime guideline은 docs/40_knowledge/conventions/guidelines/harness-helm/ 아래에 둔다.
 #     기존 flat h2-*.md guideline은 canonical target path가 아니다.
+#   - docs/_harvest-inbox/는 clean scaffold만 seed한다.
 #   - docs/40_knowledge/learnings/는 README.md scaffold만 target payload에 남긴다.
 #     source repository learning 본문은 target project에 적용하지 않는다.
 #   - docs/50_operations/releases/*.release-notes.md는 payload에서 제외한다.
@@ -23,6 +24,7 @@
 # .harness-helm runtime 기반
 copy      payload/.harness-helm/h2-cartridge.yml                   .harness-helm/h2-cartridge.yml
 copy      payload/.harness-helm/h2-compound.yml                    .harness-helm/h2-compound.yml
+copy      payload/.harness-helm/h2-harvest.yml                     .harness-helm/h2-harvest.yml
 copy      payload/.harness-helm/h2-schema.yml                      .harness-helm/h2-schema.yml
 copy      payload/.harness-helm/scripts/harness.py                 .harness-helm/scripts/harness.py
 copy_dir  payload/.harness-helm/scripts/harness_lib/               .harness-helm/scripts/harness_lib/
@@ -36,14 +38,17 @@ copy_dir  payload/.harness-helm/runs/_templates/                   .harness-helm
 copy_dir  payload/.claude/commands/h2/                             .claude/commands/h2/
 copy      payload/.claude/skills/harness-helm/SKILL.md             .claude/skills/harness-helm/SKILL.md
 copy_dir  payload/.claude/skills/harness-helm/references/          .claude/skills/harness-helm/references/
+copy_dir  payload/.claude/skills/h2-harvest/                       .claude/skills/h2-harvest/
 
 # Codex adapter surface
 copy_dir  payload/.codex/skills/h2/                                .codex/skills/h2/
 copy      payload/.codex/skills/harness-helm/SKILL.md              .codex/skills/harness-helm/SKILL.md
 copy_dir  payload/.codex/skills/harness-helm/references/           .codex/skills/harness-helm/references/
+copy_dir  payload/.codex/skills/h2-harvest/                        .codex/skills/h2-harvest/
 
 # docs template (`harness new-doc`에서 사용)
 copy_dir  payload/docs/_templates/                                 docs/_templates/
+copy      payload/docs/_harvest-inbox/.gitkeep                     docs/_harvest-inbox/.gitkeep
 copy      payload/docs/_archive/.gitkeep                           docs/_archive/.gitkeep
 copy_if_absent payload/docs/_indexes/index_kb.jsonl                docs/_indexes/index_kb.jsonl
 copy_if_absent payload/docs/_indexes/index_domain.jsonl            docs/_indexes/index_domain.jsonl
