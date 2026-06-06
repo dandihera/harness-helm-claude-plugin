@@ -103,10 +103,10 @@ docs/_archive/{month}/{timestamp}_{feature}/
 
 `runs-summary.md`는 archive 시점의 timing summary다. 생성 직전의 임시 JSON summary는 다음 값을 기반으로 Markdown을 렌더링한다.
 
-- `runs`: 단계별 `run_id`, `command`, `status`, `started_at`, `completed_at`, `elapsed_seconds`, `invoked_surface`, `invocation_mode`
+- `runs`: 단계별 `run_id`, `command`, `status`, `started_at`, `completed_at`, `elapsed_seconds`, `invoked_surface`, `invocation_mode`, 그리고 autorun 반복 증거(`iteration_index`, `stage_attempt`, `back_edge_from`, `back_edge_reason`, `back_edge_reason_key`, `autorun_resolution`)
 - `total_elapsed_seconds`: 단계별 elapsed 합계. Autorun child stage snapshot entry가 있으면 direct `h2-autorun` parent elapsed는 중복 합산하지 않고 wall-clock evidence로만 둔다.
 - `archive_wall_clock_seconds`: archive에 포함된 첫 started_at부터 마지막 completed_at까지의 wall-clock
-- `autorun_groups`: 동일 `autorun_id`로 묶인 child stage의 pipeline total
+- `autorun_groups`: 동일 `autorun_id`로 묶인 child stage의 pipeline total과 반복 요약
 - `warnings`: legacy archive fallback, run-id timestamp mismatch, snapshot stage timing 누락 등 조회자가 알아야 할 조건
 
 Archive root의 `runs-summary.md`는 `docs/_templates/runs-summary.md`를 읽어 생성한다. Template은 사람이 읽는 타이틀, 섹션명, 컬럼명을 담고, `harness_lib.run_lifecycle` renderer는 다음 placeholder에 동적 값을 주입한다.
@@ -117,6 +117,7 @@ Archive root의 `runs-summary.md`는 `docs/_templates/runs-summary.md`를 읽어
 - `{{totals_rows}}`
 - `{{runs_rows}}`
 - `{{autorun_group_rows}}`
+- `{{autorun_iteration_rows}}`
 - `{{warnings_block}}`
 
 Target runtime에 template이 없으면 renderer의 built-in fallback template으로 같은 기본 구조를 출력한다. Summary JSON은 machine-readable source of truth이고, Markdown template은 human-readable presentation layer다.

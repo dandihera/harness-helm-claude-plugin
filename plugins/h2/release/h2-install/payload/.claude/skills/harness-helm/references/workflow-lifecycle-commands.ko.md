@@ -12,7 +12,7 @@ Claude Code와 Codex h2 command meaning을 위한 compact runtime snapshot입니
 - `h2-plan`: 작업을 계획하고 `docs/01_plan/{feature}.md`로 route합니다.
 - `h2-design`: implementation design을 작성하고 `docs/02_design/{feature}.md`로 route합니다.
 - `h2-analysis`: plan/design gap을 점검하고 alignment note를 `docs/02_design/{feature}.analysis.md`에 기록합니다.
-- `h2-autorun`: design 이후 `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, `h2-archive`를 순서대로 실행하며 `status: blocked`에서 중단합니다.
+- `h2-autorun`: design 이후 `h2-analysis`를 실행한 뒤, test 또는 review가 `next.recommended_h2_step: h2-build`를 반환하면 `h2-build -> h2-test -> h2-review` state machine을 반복합니다. 최신 test와 review가 forward 진행을 허용한 뒤에만 `h2-report`, `h2-compound`, `h2-archive`를 실행하며, `status: blocked`, 반복된 unresolved reason, review 미실행, max iteration 초과에서 중단합니다.
 - `h2-rewind`: 특정 `h2-autorun` pre-step snapshot을 복원합니다. Snapshot이 없으면 `blocked:no-snapshot`으로 중단합니다.
 - `h2-build`: implementation work와 changed files를 기록합니다.
 - `h2-test`: test execution, skipped check, remaining verification을 기록합니다.

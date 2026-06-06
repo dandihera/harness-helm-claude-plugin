@@ -178,8 +178,11 @@ Recommended Markdown shape:
 
 - Run `h2-context` meaning as preflight and create a fresh context pack for this autorun; older context packs may be referenced as supporting docs.
 - Require `docs/02_design/{feature}.md` before starting. If the design is missing or explicitly blocked, use `status: blocked`.
-- Execute `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, and `h2-archive` in that order.
+- Execute `h2-analysis` once, then run the `h2-build -> h2-test -> h2-review` state machine until the latest test and review allow forward progress. If `h2-test` or `h2-review` returns `next.recommended_h2_step: h2-build`, treat it as a back-edge iteration request, not as a warning.
+- Do not run `h2-report`, `h2-compound`, or `h2-archive` while the latest `h2-test` or `h2-review` still requests `h2-build`, while review has never run, or while the iteration guard is blocked.
 - Before each child step, save the pre-step snapshot using the `h2-snapshot save` meaning so `h2-rewind` can restore that step boundary.
+- Record iteration evidence in `autorun-summary.md` and manifests when possible: `iteration_index`, `stage_attempt`, `back_edge_from`, `back_edge_reason`, `back_edge_reason_key`, and `autorun_resolution`.
+- Use max_iterations `5` unless project runtime policy provides a stricter value. Stop with `status: blocked` when the same unresolved reason repeats or the max iteration count is exceeded.
 - Use `code` as the default `h2-review` type. User input may override it with `review=code|qa|security|cross`; select `security`, `qa`, or `cross` only when design/test evidence or Cross Review policy criteria support that route.
 - Stop immediately when a child step returns `status: blocked`.
 - Treat `verification.not_verified` as a warning and summarize it, except that missing human review evidence must be highlighted in the summary.

@@ -32,7 +32,7 @@ Use `_unscoped` instead of `{feature}` when the feature is unknown.
 
 ## Archive Retention
 
-After `h2-archive`, archive-local `runs/` keeps only flattened Markdown artifacts directly under `runs/`, such as `plan-context-pack.md`, `design-context-pack.md`, `autorun-context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, and `compound-candidates.md`. The archive root keeps `runs-summary.md`. Run manifests, transient `runs/stage-runtime-summary.json`, run-id directories, snapshots, raw, normalized, promotion candidates, and restore backups are pruned after the Markdown summary is generated.
+After `h2-archive`, archive-local `runs/` keeps only flattened Markdown artifacts directly under `runs/`, such as `plan-context-pack.md`, `design-context-pack.md`, `autorun-context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, and `compound-candidates.md`. The archive root keeps `runs-summary.md`, including autorun iteration rows when child stage manifests contain `iteration_index`, `stage_attempt`, `back_edge_from`, `back_edge_reason`, `back_edge_reason_key`, or `autorun_resolution`. Run manifests, transient `runs/stage-runtime-summary.json`, run-id directories, snapshots, raw, normalized, promotion candidates, and restore backups are pruned after the Markdown summary is generated.
 
 ## Avoid
 

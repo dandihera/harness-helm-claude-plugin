@@ -12,7 +12,7 @@ Compact runtime snapshot of `0301 Core Workflow Spec`.
 - `h2-plan`: create or update `docs/01_plan/{feature}.md` with goal, scope, non-goals, done criteria, risk, and verification.
 - `h2-design`: create or update `docs/02_design/{feature}.md` with implementation design based on the plan.
 - `h2-analysis`: compare plan and design, record gaps, and recommend alignment work in `docs/02_design/{feature}.analysis.md`.
-- `h2-autorun`: after design, orchestrate `h2-analysis` through `h2-archive` and summarize step status in `.harness-helm/runs/{feature}/{run-id}/autorun-summary.md`.
+- `h2-autorun`: after design, orchestrate `h2-analysis`, iterate `h2-build -> h2-test -> h2-review` on test/review back-edges, and run report/compound/archive only after the latest test and review allow forward progress. Summarize step and iteration status in `.harness-helm/runs/{feature}/{run-id}/autorun-summary.md`.
 - `h2-rewind`: restore a specific `h2-autorun` pre-step snapshot and record evidence in `.harness-helm/runs/{feature}/{run-id}/snapshots/{step}/restore.md`.
 - `h2-build`: record implementation work, changed files, risks, and blocked items.
 - `h2-test`: record test commands, results, skipped checks, failures, and remaining verification.

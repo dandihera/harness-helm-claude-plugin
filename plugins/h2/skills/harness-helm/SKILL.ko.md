@@ -179,8 +179,11 @@ Recommended Markdown shape:
 
 - preflight로 `h2-context` 의미를 실행하고 이번 autorun을 위한 새 context pack을 만든다. 기존 context pack은 supporting docs로 참조할 수 있다.
 - 시작 전에 `docs/02_design/{feature}.md`가 있어야 한다. design이 없거나 명시적으로 blocked이면 `status: blocked`를 사용한다.
-- `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, `h2-archive`를 이 순서로 실행한다.
+- `h2-analysis`를 한 번 실행한 뒤, 최신 test와 review가 forward 진행을 허용할 때까지 `h2-build -> h2-test -> h2-review` state machine을 실행한다. `h2-test` 또는 `h2-review`가 `next.recommended_h2_step: h2-build`를 반환하면 warning이 아니라 back-edge iteration 요청으로 취급한다.
+- 최신 `h2-test` 또는 `h2-review`가 아직 `h2-build`를 요청하거나, review가 한 번도 실행되지 않았거나, iteration guard가 blocked이면 `h2-report`, `h2-compound`, `h2-archive`를 실행하지 않는다.
 - 각 child step 실행 직전에 `h2-snapshot save` 의미로 pre-step snapshot을 저장해 `h2-rewind`가 해당 단계 경계를 복원할 수 있게 한다.
+- 가능하면 `autorun-summary.md`와 manifest에 iteration evidence를 기록한다: `iteration_index`, `stage_attempt`, `back_edge_from`, `back_edge_reason`, `back_edge_reason_key`, `autorun_resolution`.
+- Project runtime policy가 더 엄격한 값을 제공하지 않으면 max_iterations `5`를 사용한다. 동일 unresolved reason이 반복되거나 max iteration을 초과하면 `status: blocked`로 중단한다.
 - 기본 `h2-review` type은 `code`다. 사용자 입력은 `review=code|qa|security|cross`로 override할 수 있으며, `security`, `qa`, `cross`는 design/test evidence 또는 Cross Review policy 기준이 있을 때만 선택한다.
 - 하위 단계가 `status: blocked`를 반환하면 즉시 중단한다.
 - `verification.not_verified`는 warning으로 요약한다. 단, 사람 review evidence 누락은 summary에서 강조한다.

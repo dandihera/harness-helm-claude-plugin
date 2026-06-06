@@ -21,6 +21,12 @@ Archive: `{{archive_path}}`
 |---|---:|---:|---|---|
 {{autorun_group_rows}}
 
+## Autorun Iterations
+
+| autorun_id | iteration | stage | attempt | status | back_edge_from | reason | resolution |
+|---|---:|---|---:|---|---|---|---|
+{{autorun_iteration_rows}}
+
 ## Warnings
 
 {{warnings_block}}

@@ -30,7 +30,7 @@ tags:
 h2-context -> h2-plan -> h2-design -> h2-analysis -> h2-build -> h2-test -> h2-review -> h2-report -> h2-compound -> h2-archive
 ```
 
-`h2-autorun`은 위 흐름 중 analysis부터 archive까지를 이어서 실행하는 orchestration command다. 각 child step 전에 rewind 가능한 snapshot을 남겨야 한다. 사용자가 `h2-autorun`을 요청한 경우 archive까지 자동 진행한다는 판단이 포함된 것으로 보고, `h2-archive`는 기본적으로 실제 archive를 실행한다. dry-run은 사용자가 preview-only 동작을 명시적으로 요청할 때만 사용한다.
+`h2-autorun`은 위 흐름 중 analysis 이후를 orchestration하되, fixed list를 한 번 훑는 command가 아니다. `h2-analysis`는 한 번 실행하고, `h2-test` 또는 `h2-review`가 `next.recommended_h2_step: h2-build`를 반환하면 `h2-build -> h2-test -> h2-review`를 back-edge iteration으로 반복한다. 최신 `h2-test`와 `h2-review`가 forward 진행을 허용하기 전에는 `h2-report`, `h2-compound`, `h2-archive`를 실행하지 않는다. Review가 한 번도 실행되지 않았거나, 동일 unresolved reason 반복 또는 max iteration 초과가 발생하면 `status: blocked`로 중단한다. 각 child step 전에 rewind 가능한 snapshot을 남겨야 한다. 사용자가 `h2-autorun`을 요청한 경우 archive까지 자동 진행한다는 판단이 포함된 것으로 보고, gate 통과 후 `h2-archive`는 기본적으로 실제 archive를 실행한다. dry-run은 사용자가 preview-only 동작을 명시적으로 요청할 때만 사용한다.
 
 ## 공통 출력
 

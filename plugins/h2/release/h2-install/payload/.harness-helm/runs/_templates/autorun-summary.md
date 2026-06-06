@@ -54,9 +54,27 @@ next:
 | h2-compound | <TODO> | <TODO> | <TODO> | <TODO> | <TODO> |
 | h2-archive | <TODO> | <TODO> | <TODO> | <TODO> | <TODO> |
 
+## Iterations
+
+| iteration | stage | attempt | status | artifact | next_recommended_h2_step | back_edge_from | reason | resolution |
+|---:|---|---:|---|---|---|---|---|---|
+| <TODO> | <TODO> | <TODO> | <TODO> | <TODO> | <TODO> | <TODO> | <TODO> | <TODO: requested | resolved | skipped | unresolved | blocked:max-iterations | blocked:repeated-reason | blocked:review-not-run> |
+
+## Gate Result
+
+- latest_test_forward: <TODO: true | false | missing>
+- latest_review_forward: <TODO: true | false | missing>
+- report_allowed: <TODO: true | false>
+- compound_allowed: <TODO: true | false>
+- archive_allowed: <TODO: true | false>
+
 ## Blocked Reason
 
 - <TODO: blocked 단계와 사유. 없으면 <없음>>
+
+## Blocked Recovery
+
+- <TODO: blocked인 경우 수동 수정 후 h2-rewind 또는 새 h2-autorun run-id로 재시작. blocked가 아니면 <없음>>
 
 ## Verification
 

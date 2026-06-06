@@ -32,7 +32,7 @@ feature가 아직 없으면 `{feature}` 대신 `_unscoped`를 사용합니다.
 
 ## Archive Retention
 
-`h2-archive` 이후 archive-local `runs/`에는 `runs/` 바로 아래로 flatten된 Markdown 산출물(`plan-context-pack.md`, `design-context-pack.md`, `autorun-context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, `compound-candidates.md` 등)만 남깁니다. Archive root에는 `runs-summary.md`를 남깁니다. Run manifest, 임시 `runs/stage-runtime-summary.json`, run-id 디렉터리, snapshot, raw, normalized, promotion candidate, restore backup은 Markdown summary 생성 후 제거합니다.
+`h2-archive` 이후 archive-local `runs/`에는 `runs/` 바로 아래로 flatten된 Markdown 산출물(`plan-context-pack.md`, `design-context-pack.md`, `autorun-context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, `compound-candidates.md` 등)만 남깁니다. Archive root에는 `runs-summary.md`를 남기며, child stage manifest에 `iteration_index`, `stage_attempt`, `back_edge_from`, `back_edge_reason`, `back_edge_reason_key`, `autorun_resolution`이 있으면 autorun iteration row도 포함합니다. Run manifest, 임시 `runs/stage-runtime-summary.json`, run-id 디렉터리, snapshot, raw, normalized, promotion candidate, restore backup은 Markdown summary 생성 후 제거합니다.
 
 ## Avoid
 

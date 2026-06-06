@@ -40,6 +40,12 @@ Archive: `{{archive_path}}`
 |---|---:|---:|---|---|
 {{autorun_group_rows}}
 
+## Autorun Iterations
+
+| autorun_id | iteration | stage | attempt | status | back_edge_from | reason | resolution |
+|---|---:|---|---:|---|---|---|---|
+{{autorun_iteration_rows}}
+
 ## Warnings
 
 {{warnings_block}}
@@ -155,6 +161,30 @@ def cartridge_fallback_surface(command: str) -> str | None:
     if not isinstance(fallback_label, str) or not fallback_label:
         return None
     return f"fallback:{fallback_label}"
+
+
+def cartridge_primary_surface(command: str) -> str | None:
+    if not paths.CARTRIDGE_PATH.exists():
+        return None
+    cartridge = parse_simple_yaml(paths.CARTRIDGE_PATH.read_text(encoding="utf-8"))
+    commands = cartridge.get("commands")
+    if not isinstance(commands, dict):
+        return None
+    mapping = commands.get(command)
+    if not isinstance(mapping, dict):
+        return None
+    provider = mapping.get("provider")
+    surface = mapping.get("surface")
+    if not isinstance(provider, str) or not provider or not isinstance(surface, str) or not surface:
+        return None
+    return f"{provider}:{surface}"
+
+
+def summary_invoked_surface(command: str, value: Any) -> str | None:
+    surface = normalize_invoked_surface(value)
+    if surface == f"harness:{command}":
+        return cartridge_primary_surface(command) or surface
+    return surface
 
 
 def format_run_timestamp(value: dt.datetime) -> str:
@@ -311,6 +341,14 @@ class RunStatsEntry:
     autorun_id: str | None
     invoked_surface: str | None = None
     invocation_mode: str = "unknown"
+    iteration_index: int | None = None
+    stage_attempt: int | None = None
+    back_edge_from: str | None = None
+    back_edge_reason: str | None = None
+    back_edge_reason_key: str | None = None
+    back_edge_reason_key_source: str | None = None
+    autorun_resolution: str | None = None
+    next_recommended_h2_step: str | None = None
 
 
 def iter_run_dirs(feature: str | None = None) -> list[Path]:
@@ -385,6 +423,36 @@ def command_from_markdown_artifact(path: Path) -> str | None:
     }.get(path.stem)
 
 
+def infer_context_stage(run_dir: Path, manifest: dict[str, Any]) -> str | None:
+    try:
+        run_id_command = command_from_run_id(run_dir.name)
+    except ValueError:
+        run_id_command = None
+    if run_id_command and run_id_command != "h2-context":
+        return run_id_command
+    context_pack = run_dir / "context-pack.md"
+    try:
+        text = context_pack.read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    task = manifest.get("task")
+    haystack = f"{task if isinstance(task, str) else ''}\n{text}".lower()
+    if "h2-autorun" in haystack:
+        return "h2-autorun"
+    if "recommended_h2_step: h2-design" in haystack:
+        return "h2-plan"
+    if "h2-design" in haystack:
+        return "h2-design"
+    return None
+
+
+def context_only_surface(value: Any) -> str | None:
+    surface = normalize_invoked_surface(value)
+    if surface and surface.startswith("fallback:"):
+        return surface
+    return cartridge_primary_surface("h2-context") or "harness:context-pack"
+
+
 def build_markdown_stage_entries(run_dir: Path, feature_override: str | None = None) -> list[RunStatsEntry]:
     try:
         parent_command = command_from_run_id(run_dir.name)
@@ -430,6 +498,24 @@ def build_markdown_stage_entries(run_dir: Path, feature_override: str | None = N
     return entries
 
 
+def _manifest_int(manifest: dict[str, Any], key: str) -> int | None:
+    value = manifest.get(key)
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.isdigit():
+        return int(value)
+    return None
+
+
+def _manifest_str(manifest: dict[str, Any], key: str) -> str | None:
+    value = manifest.get(key)
+    if isinstance(value, str) and value:
+        return value
+    return None
+
+
 def iter_archive_snapshot_stage_manifests(archive_path: Path) -> list[Path]:
     runs = archive_path / "runs"
     if not runs.exists() or not runs.is_dir():
@@ -463,7 +549,17 @@ def build_run_stats_entry(run_dir: Path, feature_override: str | None = None) ->
     if manifest_started_at and abs((manifest_started_at - run_id_started_at).total_seconds()) >= 1:
         warnings.append("started_at differs from run-id timestamp")
     command = str(manifest.get("command") or command_from_run_id(run_id_value))
-    invoked_surface = normalize_invoked_surface(manifest.get("invoked_surface"))
+    inferred_context_stage = False
+    if command == "h2-context":
+        inferred = infer_context_stage(run_dir, manifest)
+        if inferred is not None:
+            command = inferred
+            inferred_context_stage = True
+    invoked_surface = (
+        context_only_surface(manifest.get("invoked_surface"))
+        if inferred_context_stage
+        else summary_invoked_surface(command, manifest.get("invoked_surface"))
+    )
     invocation_mode = normalize_invocation_mode(manifest.get("invocation_mode"))
     if invoked_surface is None:
         fallback_surface = cartridge_fallback_surface(command)
@@ -491,6 +587,10 @@ def build_run_stats_entry(run_dir: Path, feature_override: str | None = None) ->
     elapsed = None
     if completed_at and started_at and status not in {"missing-manifest", "running", "incomplete"}:
         elapsed = max(0, int((completed_at - started_at).total_seconds()))
+    if inferred_context_stage:
+        status = "context-only"
+        elapsed = None
+        warnings.append("context preflight timing is not lifecycle stage duration")
     return RunStatsEntry(
         feature=str(manifest.get("feature") or feature),
         run_id=str(manifest.get("run_id") or run_id_value),
@@ -504,6 +604,14 @@ def build_run_stats_entry(run_dir: Path, feature_override: str | None = None) ->
         autorun_id=manifest.get("autorun_id") if isinstance(manifest.get("autorun_id"), str) else None,
         invoked_surface=invoked_surface,
         invocation_mode=invocation_mode,
+        iteration_index=_manifest_int(manifest, "iteration_index"),
+        stage_attempt=_manifest_int(manifest, "stage_attempt"),
+        back_edge_from=_manifest_str(manifest, "back_edge_from"),
+        back_edge_reason=_manifest_str(manifest, "back_edge_reason"),
+        back_edge_reason_key=_manifest_str(manifest, "back_edge_reason_key"),
+        back_edge_reason_key_source=_manifest_str(manifest, "back_edge_reason_key_source"),
+        autorun_resolution=_manifest_str(manifest, "autorun_resolution"),
+        next_recommended_h2_step=_manifest_str(manifest, "next_recommended_h2_step"),
     )
 
 
@@ -532,8 +640,16 @@ def build_snapshot_stage_entry(manifest_path: Path, feature_override: str | None
         manifest_path=manifest_path,
         warnings=warnings,
         autorun_id=autorun_id,
-        invoked_surface=normalize_invoked_surface(manifest.get("invoked_surface")),
+        invoked_surface=summary_invoked_surface(command, manifest.get("invoked_surface")),
         invocation_mode=normalize_invocation_mode(manifest.get("invocation_mode")),
+        iteration_index=_manifest_int(manifest, "iteration_index"),
+        stage_attempt=_manifest_int(manifest, "stage_attempt"),
+        back_edge_from=_manifest_str(manifest, "back_edge_from"),
+        back_edge_reason=_manifest_str(manifest, "back_edge_reason"),
+        back_edge_reason_key=_manifest_str(manifest, "back_edge_reason_key"),
+        back_edge_reason_key_source=_manifest_str(manifest, "back_edge_reason_key_source"),
+        autorun_resolution=_manifest_str(manifest, "autorun_resolution"),
+        next_recommended_h2_step=_manifest_str(manifest, "next_recommended_h2_step"),
     )
 
 
@@ -582,6 +698,14 @@ def run_stats_to_dict(entry: RunStatsEntry) -> dict[str, Any]:
         "autorun_id": entry.autorun_id,
         "invoked_surface": entry.invoked_surface,
         "invocation_mode": entry.invocation_mode,
+        "iteration_index": entry.iteration_index,
+        "stage_attempt": entry.stage_attempt,
+        "back_edge_from": entry.back_edge_from,
+        "back_edge_reason": entry.back_edge_reason,
+        "back_edge_reason_key": entry.back_edge_reason_key,
+        "back_edge_reason_key_source": entry.back_edge_reason_key_source,
+        "autorun_resolution": entry.autorun_resolution,
+        "next_recommended_h2_step": entry.next_recommended_h2_step,
         "manifest_path": paths.display_path(entry.manifest_path) if entry.manifest_path else None,
         "warnings": entry.warnings,
     }
@@ -606,6 +730,22 @@ def run_stats_entry_from_dict(item: dict[str, Any]) -> RunStatsEntry:
         autorun_id=item.get("autorun_id") if isinstance(item.get("autorun_id"), str) else None,
         invoked_surface=normalize_invoked_surface(item.get("invoked_surface")),
         invocation_mode=normalize_invocation_mode(item.get("invocation_mode")),
+        iteration_index=item.get("iteration_index") if isinstance(item.get("iteration_index"), int) else None,
+        stage_attempt=item.get("stage_attempt") if isinstance(item.get("stage_attempt"), int) else None,
+        back_edge_from=item.get("back_edge_from") if isinstance(item.get("back_edge_from"), str) else None,
+        back_edge_reason=item.get("back_edge_reason") if isinstance(item.get("back_edge_reason"), str) else None,
+        back_edge_reason_key=item.get("back_edge_reason_key") if isinstance(item.get("back_edge_reason_key"), str) else None,
+        back_edge_reason_key_source=(
+            item.get("back_edge_reason_key_source")
+            if isinstance(item.get("back_edge_reason_key_source"), str)
+            else None
+        ),
+        autorun_resolution=item.get("autorun_resolution") if isinstance(item.get("autorun_resolution"), str) else None,
+        next_recommended_h2_step=(
+            item.get("next_recommended_h2_step")
+            if isinstance(item.get("next_recommended_h2_step"), str)
+            else None
+        ),
     )
 
 
@@ -617,7 +757,13 @@ def autorun_groups(entries: list[RunStatsEntry]) -> list[dict[str, Any]]:
     groups: list[dict[str, Any]] = []
     by_key: dict[tuple[str, str], list[RunStatsEntry]] = {}
     for entry in entries:
-        if entry.autorun_id and entry.elapsed_seconds is not None and entry.started_at and entry.completed_at:
+        if (
+            entry.autorun_id
+            and entry.command != "h2-autorun"
+            and entry.elapsed_seconds is not None
+            and entry.started_at
+            and entry.completed_at
+        ):
             by_key.setdefault((entry.feature, entry.autorun_id), []).append(entry)
     for (feature, autorun_id), grouped in sorted(by_key.items()):
         starts = [entry.started_at for entry in grouped if entry.started_at]
@@ -634,9 +780,24 @@ def autorun_groups(entries: list[RunStatsEntry]) -> list[dict[str, Any]]:
                 "completed_at": format_run_timestamp(max(ends)),
                 "elapsed_seconds": total,
                 "elapsed": format_elapsed(total, "completed"),
+                "iteration_summary": autorun_iteration_summary(grouped),
             }
         )
     return groups
+
+
+def autorun_iteration_summary(entries: list[RunStatsEntry]) -> str:
+    grouped: dict[int, list[str]] = {}
+    for entry in sorted(entries, key=latest_activity):
+        if entry.iteration_index is None:
+            continue
+        grouped.setdefault(entry.iteration_index, []).append(entry.command)
+    if not grouped:
+        return ""
+    return "; ".join(
+        f"{iteration}: {', '.join(commands)}"
+        for iteration, commands in sorted(grouped.items())
+    )
 
 
 def archive_wall_clock(entries: list[RunStatsEntry]) -> int | None:
@@ -754,6 +915,53 @@ def _autorun_group_slowest_stage(runs: list[dict[str, Any]], autorun_id: Any) ->
     return f"{command} ({elapsed})"
 
 
+def _has_autorun_iteration_metadata(run: dict[str, Any]) -> bool:
+    return any(
+        run.get(key) is not None
+        for key in (
+            "iteration_index",
+            "stage_attempt",
+            "back_edge_from",
+            "back_edge_reason",
+            "back_edge_reason_key",
+            "autorun_resolution",
+        )
+    )
+
+
+def _autorun_iteration_rows(runs: list[dict[str, Any]]) -> str:
+    entries = [run for run in runs if run.get("autorun_id") and _has_autorun_iteration_metadata(run)]
+    if not entries:
+        return "| none |  |  |  |  |  |  |  |"
+    entries.sort(
+        key=lambda run: (
+            str(run.get("autorun_id") or ""),
+            run.get("iteration_index") if isinstance(run.get("iteration_index"), int) else 0,
+            run.get("stage_attempt") if isinstance(run.get("stage_attempt"), int) else 0,
+            str(run.get("command") or ""),
+        )
+    )
+    rows: list[str] = []
+    for run in entries:
+        rows.append(
+            "| "
+            + " | ".join(
+                [
+                    _markdown_cell(run.get("autorun_id")),
+                    _markdown_cell(run.get("iteration_index")),
+                    _markdown_cell(run.get("command")),
+                    _markdown_cell(run.get("stage_attempt")),
+                    _markdown_cell(run.get("status")),
+                    _markdown_cell(run.get("back_edge_from")),
+                    _markdown_cell(run.get("back_edge_reason")),
+                    _markdown_cell(run.get("autorun_resolution")),
+                ]
+            )
+            + " |"
+        )
+    return "\n".join(rows)
+
+
 def render_stage_runtime_summary_markdown(summary: dict[str, Any]) -> str:
     feature = str(summary.get("feature") or "")
     runs = [item for item in raw_list_value(summary.get("runs")) if isinstance(item, dict)]
@@ -824,6 +1032,7 @@ def render_stage_runtime_summary_markdown(summary: dict[str, Any]) -> str:
             "totals_rows": totals_rows,
             "runs_rows": "\n".join(run_rows),
             "autorun_group_rows": "\n".join(autorun_group_rows),
+            "autorun_iteration_rows": _autorun_iteration_rows(runs),
             "warnings_block": warnings_block,
         },
     )

@@ -146,6 +146,46 @@ def validate_autorun_timing_evidence(feature: str) -> list[str]:
     return errors
 
 
+def unresolved_autorun_resolution(manifest: dict[str, object]) -> str | None:
+    resolution = manifest.get("autorun_resolution")
+    if not isinstance(resolution, str) or not resolution:
+        return None
+    if resolution == "unresolved" or resolution.startswith("blocked:"):
+        return resolution
+    return None
+
+
+def validate_autorun_iteration_resolution(feature: str) -> list[str]:
+    errors: list[str] = []
+    runs_root = paths.ROOT / ".harness-helm" / "runs" / feature
+    if not runs_root.exists():
+        return errors
+    for run_dir in sorted(runs_root.glob("*-h2-autorun")):
+        if not run_dir.is_dir() or not paths.RUN_ID_PATTERN.match(run_dir.name):
+            continue
+        # Snapshot manifests are the authoritative child-stage evidence. Fall back to
+        # run manifests only when structured snapshot evidence is absent.
+        manifest_paths = sorted(run_dir.glob("snapshots/*/manifest.json"))
+        if not manifest_paths:
+            manifest_paths = [run_dir / "manifest.json"] if (run_dir / "manifest.json").exists() else []
+        for manifest_path in manifest_paths:
+            try:
+                manifest = json.loads(read_text(manifest_path))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(manifest, dict):
+                continue
+            resolution = unresolved_autorun_resolution(manifest)
+            if resolution is None:
+                continue
+            step = manifest.get("step") or manifest.get("command") or manifest_path.parent.name
+            errors.append(
+                f"{manifest_path.relative_to(paths.ROOT).as_posix()}: unresolved autorun iteration "
+                f"{resolution} at {step}."
+            )
+    return errors
+
+
 def flattened_artifact_name(command: str | None, artifact: Path) -> str:
     label = artifact_stage_label(command, artifact)
     if artifact.name == "context-pack.md":
@@ -288,6 +328,12 @@ def command_archive(args: argparse.Namespace) -> int:
     if timing_errors:
         print("harness archive: missing h2-autorun timing evidence")
         for error in timing_errors:
+            print(f"  {error}")
+        return 1
+    iteration_errors = validate_autorun_iteration_resolution(feature)
+    if iteration_errors:
+        print("harness archive: unresolved h2-autorun iteration")
+        for error in iteration_errors:
             print(f"  {error}")
         return 1
     print(f"harness archive: feature={feature}")

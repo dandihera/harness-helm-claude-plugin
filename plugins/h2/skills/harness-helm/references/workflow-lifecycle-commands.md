@@ -12,7 +12,7 @@ This file defines command meaning and routing. It does not choose upstream provi
 - `h2-plan`: plan work and route to `docs/01_plan/{feature}.md`.
 - `h2-design`: create implementation design and route to `docs/02_design/{feature}.md`.
 - `h2-analysis`: inspect plan/design gaps and route alignment notes to `docs/02_design/{feature}.analysis.md`.
-- `h2-autorun`: after design, run `h2-analysis`, `h2-build`, `h2-test`, `h2-review`, `h2-report`, `h2-compound`, and `h2-archive` in order, stopping on `status: blocked`.
+- `h2-autorun`: after design, run `h2-analysis`, then iterate the `h2-build -> h2-test -> h2-review` state machine when test or review returns `next.recommended_h2_step: h2-build`. Run `h2-report`, `h2-compound`, and `h2-archive` only after the latest test and review allow forward progress; stop on `status: blocked`, repeated unresolved reason, missing review, or max iteration overflow.
 - `h2-rewind`: restore a specific `h2-autorun` pre-step snapshot; if the snapshot is missing, block with `blocked:no-snapshot`.
 - `h2-build`: record implementation work and changed files.
 - `h2-test`: record test execution, skipped checks, and remaining verification.
