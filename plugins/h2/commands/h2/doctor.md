@@ -46,6 +46,7 @@ allowed-tools: [Bash, Read]
    - 모두 실패하면 사용자에게 `--plugin-root <path>`를 제공하도록 안내 후 중단.
 
 3. **Preflight**
+   - **IMPORTANT**: h2 runtime은 Go binary(`harness`)다. `python3`, `harness.py`, `harness_lib/` 는 v0.20.0에서 완전히 제거됐다. Python 버전 체크를 실행하거나 `harness.py`를 호출하지 말 것.
    - `Bash`로 `test -f <plugin-root>/release/h2-install/MANIFEST.txt` 확인. 없으면 plugin payload 누락 FAIL.
    - `Bash`로 `<plugin-root>/release/h2-install/h2-install-v*.txt` marker 중 최고 version을 확인.
    - host platform이 `darwin/arm64`, `darwin/amd64`, `linux/amd64`, `linux/arm64`, `windows/amd64` 중 하나인지 확인. Windows ARM64 등 unsupported platform이면 remediation과 함께 FAIL.
