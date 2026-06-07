@@ -107,11 +107,14 @@ h2-install.sh \
 ## Re-run / Idempotency
 
 - 같은 version으로 재실행 시 `unchanged`가 유지되어야 한다.
-- plugin이 update된 후 재실행은 `install-manifest.json.package_version`과 plugin payload marker `h2-install-v{version}.txt`를 SemVer로 비교하여 upgrade가 필요한 경우에만 변경을 적용한다.
+- plugin이 update된 후 정상 bootstrap target은 plugin hook 또는 target command guard가 자동 apply를 시도한다.
+- 자동 apply가 실패하거나 manifest가 partial/invalid이면 `/h2:doctor`가 수동 복구 command로 동작한다.
+- 수동 재실행은 `install-manifest.json.package_version`과 plugin payload marker `h2-install-v{version}.txt`를 SemVer로 비교하여 upgrade가 필요한 경우에만 변경을 적용한다.
 - 낮은 version payload로 높은 version target을 덮는 downgrade는 기본 차단한다.
 
 ## Notes
 
 - `/h2:doctor`는 `h2` plugin scope의 유일한 h2 command다. 다른 `/h2:*` 명령은 target install 단계에서 doctor-first guard preamble이 주입된 상태로 target 측 `.claude/commands/h2/*.md`에 위치한다.
 - guard 판정 기준은 `<target>/.harness-helm/install-manifest.json` 단독이다. doctor 결과 파일은 진단/log 용도로만 사용된다.
+- 자동 apply 진단 결과는 `<target>/.harness-helm/doctor/auto-apply-latest.json`에 남긴다. 이 파일도 guard 판정에는 사용하지 않는다.
 - `/h2:doctor` 진단 규칙의 전체 카탈로그(스키마·세분화된 PASS/WARN/FAIL 정책)는 별도 plan 소관이며, 본 command는 first-run에 필요한 최소 체크만 수행한다.

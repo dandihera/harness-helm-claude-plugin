@@ -26,7 +26,12 @@ human_verified_by: 장태욱
 
 ## Problem
 
-Plugin install로 target에 펼쳐지는 `.claude/commands/<namespace>/*.md` 명령들이 "사전 조건이 충족되지 않으면 자동으로 중단하고 안내"하는 first-run gate를 가져야 한다. install 엔진(`harness.py install`)이나 manifest schema를 수정해 처리할 수도 있지만 release 도구의 "engine 재구현 금지" 원칙과 충돌하며, 한 번 install된 target 명령에 일관되게 guard를 적용하기 어렵다.
+Plugin install로 target에 펼쳐지는 `.claude/commands/<namespace>/*.md` 명령들이 "사전 조건이 충족되지 않으면 자동으로 중단하고 안내"하는 first-run gate를 가져야 한다. install 엔진이나 manifest schema를 수정해 처리할 수도 있지만 release 도구의 "engine 재구현 금지" 원칙과 충돌하며, 한 번 install된 target 명령에 일관되게 guard를 적용하기 어렵다.
+
+현재 guard는 두 가지 역할을 가진다.
+
+- 최초 설치 전 target에는 `/h2:doctor` gate를 안내하고 중단한다.
+- 이미 정상 bootstrap된 target이 current plugin payload보다 오래되었으면 plugin auto-apply script를 먼저 시도하고, 실패할 때만 `/h2:doctor` 수동 복구를 안내한다.
 
 ## Solution
 
@@ -82,12 +87,14 @@ injected, _skipped = apply_guard_preambles(payload)
 - idempotency 검사로 같은 staging 디렉터리에 두 번 호출해도 중복 inject 없음
 - zip builder와 plugin builder가 같은 helper를 호출하므로 두 배포면이 byte-equal guard를 받음
 - LEARN-20260530-002의 "per-target source-of-truth 단독" 원칙을 preamble 본문에서 직접 명시 (install-manifest만 확인) → multi-target false-pass 방지
+- 업데이트 drift에서는 새 updater를 만들지 않고 plugin package의 `scripts/h2-auto-apply.sh`가 기존 `release/h2-install.sh --backup` install engine을 호출한다.
 
 ## When NOT to Use
 
 - guard 본문이 명령마다 달라야 하는 경우 (이 함수는 단일 preamble 가정. 다중 preamble은 별도 dispatcher 필요)
 - frontmatter 없는 markdown 명령을 사용하는 plugin (현 helper는 frontmatter 부재 시 skip)
 - guard signal이 per-target이 아니라 전역인 경우 (이 패턴은 per-target source-of-truth와 짝)
+- 최초 bootstrap 전에 target 파일을 사용자 확인 없이 쓰려는 경우. 최초 설치는 여전히 `/h2:doctor` gate가 필요하다.
 - 모델이 markdown instruction을 무시할 수 있는 환경에서 hard gate가 필요한 경우 (preamble은 advisory에 가까움. 정말 강제하려면 wrapper script 단위 차단 필요)
 
 ## Verification

@@ -270,6 +270,7 @@ Recommended Markdown shape:
 - `h2-autorun` 안의 `h2-archive`는 preview 단계가 아니라 execute 단계다. 사용자가 lifecycle 자동 진행을 이미 요청했으므로 기본값은 non-dry-run archive다.
 - archive file movement를 재구현하지 않는다.
 - `harness archive`는 `.harness-helm/runs/{feature}/`를 `docs/_archive/{archive-folder}/runs/`로 이동하고 임시 `runs/stage-runtime-summary.json`을 쓴 뒤 archive root의 `stage-runtime-summary.md`를 생성한다. 이후 임시 JSON을 제거하고 각 run root의 Markdown 산출물(`context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, `compound-candidates.md` 등)만 남긴다. Run manifest, snapshot, raw, normalized, promotion candidate, restore backup은 summary 생성 후 제거된다.
+- `runs-summary.md`를 직접 작성하지 않는다. 이 파일은 `harness archive`가 단독으로 생성한다. 직접 작성하면 skill이 run manifest 데이터에 접근할 수 없어 모든 timing 항목이 `not available`로 출력된다.
 - archive 완료 후 `.harness-helm/scripts/harness kb-index`를 실행해 active docs가 indexed 위치에서 archive로 이동된 상태를 `docs/_indexes/*.md`에 반영한다. 재생성된 index 파일을 archive와 같은 commit/PR에 포함한다. 누락하면 다음 push에서 `harness-validate`(또는 동등한 CI)가 index drift로 실패한다.
 - `.harness-helm/runs/{feature}/{run-id}/archive-plan.md`로 route한다.
 - `next.recommended_h2_step`을 `h2-ops` 또는 `null`로 설정한다.

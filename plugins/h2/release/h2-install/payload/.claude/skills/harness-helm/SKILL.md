@@ -269,6 +269,7 @@ Recommended Markdown shape:
 - In `h2-autorun`, `h2-archive` is an execute step, not a preview step. Use non-dry-run archive by default because the user has already requested automatic progression through the lifecycle.
 - Do not reimplement archive file movement.
 - `harness archive` moves `.harness-helm/runs/{feature}/` to `docs/_archive/{archive-folder}/runs/`, writes transient `runs/stage-runtime-summary.json`, writes root `stage-runtime-summary.md`, then prunes the transient JSON and keeps only run root-level Markdown artifacts such as `context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, and `compound-candidates.md`; run manifests, snapshots, raw, normalized, promotion candidates, and restore backups are pruned after summary generation.
+- Do not write `runs-summary.md` directly. This file is written exclusively by `harness archive`; writing it yourself produces all-`not available` timing because the skill has no access to run manifest data.
 - After archive completes, run `.harness-helm/scripts/harness kb-index` to refresh `docs/_indexes/*.md` after active docs move out of indexed locations. Include the regenerated index files in the same archive commit/PR; otherwise `harness-validate` (or equivalent CI) flags index drift on the next push.
 - Route to `.harness-helm/runs/{feature}/{run-id}/archive-plan.md`.
 - Set `next.recommended_h2_step` to `h2-ops` or `null`.

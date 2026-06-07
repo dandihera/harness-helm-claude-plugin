@@ -1,0 +1,31 @@
+{
+  "description": "h2 target runtime auto-apply hooks",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/h2-auto-apply.sh",
+            "args": [],
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "matcher": "^h2:",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/h2-auto-apply.sh",
+            "args": [],
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}
