@@ -217,7 +217,7 @@ Recommended Markdown shape:
 - Execute `h2-analysis` once, then run the `h2-build -> h2-test -> h2-review` state machine until the latest test and review allow forward progress. If `h2-test` or `h2-review` returns `next.recommended_h2_step: h2-build`, treat it as a back-edge iteration request, not as a warning.
 - Do not run `h2-report`, `h2-compound`, or `h2-archive` while the latest `h2-test` or `h2-review` still requests `h2-build`, while review has never run, or while the iteration guard is blocked.
 - Before each child step, save the pre-step snapshot using the `h2-snapshot save` meaning so `h2-rewind` can restore that step boundary.
-- After each child step completes, call `h2-snapshot complete` with `--invoked-surface <resolved-surface> --invocation-mode <mode>` so the runs-summary table is populated. The resolved surface is the actual provider:surface string used for that step (e.g. `compound-engineering:ce-plan`); use `fallback:<label>` when the primary surface was unavailable.
+- After each child step completes, call `h2-snapshot complete` with `--invoked-surface <resolved-surface> --invocation-mode <mode>` so the runs-summary table has `started_at` and `completed_at` timing evidence. The resolved surface is the actual provider:surface string used for that step (e.g. `compound-engineering:ce-plan`); use `fallback:<label>` when the primary surface was unavailable.
 - Record iteration evidence in `autorun-summary.md` and manifests when possible: `iteration_index`, `stage_attempt`, `back_edge_from`, `back_edge_reason`, `back_edge_reason_key`, and `autorun_resolution`.
 - Use max_iterations `5` unless project runtime policy provides a stricter value. Stop with `status: blocked` when the same unresolved reason repeats or the max iteration count is exceeded.
 - Use `code` as the default `h2-review` type. User input may override it with `review=code|qa|security|cross`; select `security`, `qa`, or `cross` only when design/test evidence or Cross Review policy criteria support that route.
@@ -304,7 +304,8 @@ Recommended Markdown shape:
 - Run `.harness-helm/scripts/harness archive {feature}` to execute the archive. Use `--dry-run` to preview changes without applying them.
 - In `h2-autorun`, `h2-archive` is an execute step, not a preview step. Use non-dry-run archive by default because the user has already requested automatic progression through the lifecycle.
 - Do not reimplement archive file movement.
-- `harness archive` moves `.harness-helm/runs/{feature}/` to `docs/_archive/{archive-folder}/runs/`, writes transient `runs/stage-runtime-summary.json`, writes root `stage-runtime-summary.md`, then prunes the transient JSON and keeps only run root-level Markdown artifacts such as `context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, and `compound-candidates.md`; run manifests, snapshots, raw, normalized, promotion candidates, and restore backups are pruned after summary generation.
+- `harness archive` requires timing manifests with `started_at` and `completed_at` for lifecycle docs and run stage artifacts. It must fail instead of producing `runs-summary.md` rows with `not measured` duration when that evidence is missing or incomplete.
+- `harness archive` moves `.harness-helm/runs/{feature}/` to `docs/_archive/{archive-folder}/runs/`, writes transient `runs/stage-runtime-summary.json`, writes root `runs-summary.md`, then prunes the transient JSON and keeps only run root-level Markdown artifacts such as `context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, and `compound-candidates.md`; run manifests, snapshots, raw, normalized, promotion candidates, and restore backups are pruned after summary generation.
 - After archive completes, run `.harness-helm/scripts/harness kb-index` to refresh `docs/_indexes/*.md` after active docs move out of indexed locations. Include the regenerated index files in the same archive commit/PR; otherwise `harness-validate` (or equivalent CI) flags index drift on the next push.
 - Route to `.harness-helm/runs/{feature}/{run-id}/archive-plan.md`.
 - Set `next.recommended_h2_step` to `h2-ops` or `null`.
@@ -337,7 +338,7 @@ Use the staging rules from this skill and bundled `references/core-workflow.md`:
 - Use `.harness-helm/runs/_unscoped/{run-id}/` when `feature` is unknown.
 - `run-id` format is `YYYYMMDD-HHMMSS-h2-{command}` using `Asia/Seoul`, and harness scripts validate it.
 - The runtime adapter executing the h2 command creates `raw/`, `normalized/`, and `promotion-candidates/`; the Go harness validates and cleans them up but does not create them for every lifecycle command.
-- `.harness-helm/runs/**` is not official KB and is not default retrieval input. On `h2-archive`, the feature runs folder is moved to `docs/_archive/{archive-folder}/runs/` and then minimized to run-level Markdown artifacts only; archive root `stage-runtime-summary.md` keeps the human-readable timing summary.
+- `.harness-helm/runs/**` is not official KB and is not default retrieval input. On `h2-archive`, the feature runs folder is moved to `docs/_archive/{archive-folder}/runs/` and then minimized to run-level Markdown artifacts only; archive root `runs-summary.md` keeps the human-readable timing summary.
 - Remove or mask sensitive/raw output before moving anything to official docs.
 
 ## Upstream Override Input

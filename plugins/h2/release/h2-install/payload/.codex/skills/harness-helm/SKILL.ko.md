@@ -226,7 +226,7 @@ Recommended Markdown shape:
 - `h2-analysis`를 한 번 실행한 뒤, 최신 test와 review가 forward 진행을 허용할 때까지 `h2-build -> h2-test -> h2-review` state machine을 실행한다. `h2-test` 또는 `h2-review`가 `next.recommended_h2_step: h2-build`를 반환하면 warning이 아니라 back-edge iteration 요청으로 취급한다.
 - 최신 `h2-test` 또는 `h2-review`가 아직 `h2-build`를 요청하거나, review가 한 번도 실행되지 않았거나, iteration guard가 blocked이면 `h2-report`, `h2-compound`, `h2-archive`를 실행하지 않는다.
 - 각 child step 실행 직전에 `h2-snapshot save` 의미로 pre-step snapshot을 저장해 `h2-rewind`가 해당 단계 경계를 복원할 수 있게 한다.
-- 각 child step 완료 후 `h2-snapshot complete`를 `--invoked-surface <resolved-surface> --invocation-mode <mode>`와 함께 호출해 runs-summary 표가 채워지도록 한다. resolved-surface는 해당 step에서 실제로 사용한 `provider:surface` 문자열(예: `compound-engineering:ce-plan`)이며, primary surface를 사용하지 못한 경우 `fallback:<label>` 형태를 쓴다.
+- 각 child step 완료 후 `h2-snapshot complete`를 `--invoked-surface <resolved-surface> --invocation-mode <mode>`와 함께 호출해 runs-summary 표에 `started_at`과 `completed_at` timing evidence가 채워지도록 한다. resolved-surface는 해당 step에서 실제로 사용한 `provider:surface` 문자열(예: `compound-engineering:ce-plan`)이며, primary surface를 사용하지 못한 경우 `fallback:<label>` 형태를 쓴다.
 - 가능하면 `autorun-summary.md`와 manifest에 iteration evidence를 기록한다: `iteration_index`, `stage_attempt`, `back_edge_from`, `back_edge_reason`, `back_edge_reason_key`, `autorun_resolution`.
 - Project runtime policy가 더 엄격한 값을 제공하지 않으면 max_iterations `5`를 사용한다. 동일 unresolved reason이 반복되거나 max iteration을 초과하면 `status: blocked`로 중단한다.
 - 기본 `h2-review` type은 `code`다. 사용자 입력은 `review=code|qa|security|cross`로 override할 수 있으며, `security`, `qa`, `cross`는 design/test evidence 또는 Cross Review policy 기준이 있을 때만 선택한다.
@@ -313,7 +313,8 @@ Recommended Markdown shape:
 - `.harness-helm/scripts/harness archive {feature}`를 실행해 archive를 수행한다. 변경 사항을 적용하지 않고 미리보기만 하려면 `--dry-run`을 사용한다.
 - `h2-autorun` 안의 `h2-archive`는 preview 단계가 아니라 execute 단계다. 사용자가 lifecycle 자동 진행을 이미 요청했으므로 기본값은 non-dry-run archive다.
 - archive file movement를 재구현하지 않는다.
-- `harness archive`는 `.harness-helm/runs/{feature}/`를 `docs/_archive/{archive-folder}/runs/`로 이동하고 임시 `runs/stage-runtime-summary.json`을 쓴 뒤 archive root의 `stage-runtime-summary.md`를 생성한다. 이후 임시 JSON을 제거하고 각 run root의 Markdown 산출물(`context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, `compound-candidates.md` 등)만 남긴다. Run manifest, snapshot, raw, normalized, promotion candidate, restore backup은 summary 생성 후 제거된다.
+- `harness archive`는 lifecycle 문서와 run stage 산출물에 대해 `started_at`과 `completed_at`이 있는 timing manifest를 요구한다. evidence가 없거나 불완전하면 `not measured` duration이 들어간 `runs-summary.md`를 만들지 않고 실패해야 한다.
+- `harness archive`는 `.harness-helm/runs/{feature}/`를 `docs/_archive/{archive-folder}/runs/`로 이동하고 임시 `runs/stage-runtime-summary.json`을 쓴 뒤 archive root의 `runs-summary.md`를 생성한다. 이후 임시 JSON을 제거하고 각 run root의 Markdown 산출물(`context-pack.md`, `archive-plan.md`, `autorun-summary.md`, `build.md`, `test.md`, `compound-candidates.md` 등)만 남긴다. Run manifest, snapshot, raw, normalized, promotion candidate, restore backup은 summary 생성 후 제거된다.
 - archive 완료 후 `.harness-helm/scripts/harness kb-index`를 실행해 active docs가 indexed 위치에서 archive로 이동된 상태를 `docs/_indexes/*.md`에 반영한다. 재생성된 index 파일을 archive와 같은 commit/PR에 포함한다. 누락하면 다음 push에서 `harness-validate`(또는 동등한 CI)가 index drift로 실패한다.
 - `.harness-helm/runs/{feature}/{run-id}/archive-plan.md`로 route한다.
 - `next.recommended_h2_step`을 `h2-ops` 또는 `null`로 설정한다.
@@ -339,7 +340,7 @@ Recommended Markdown shape:
 - `feature`를 알 수 없으면 `.harness-helm/runs/_unscoped/{run-id}/`를 사용한다.
 - `run-id` format은 `Asia/Seoul` 기준 `YYYYMMDD-HHMMSS-h2-{command}`이며 harness script가 검증한다.
 - h2 command를 실행하는 runtime adapter가 `raw/`, `normalized/`, `promotion-candidates/`를 생성한다. Go harness는 검증하고 정리하지만 모든 lifecycle command마다 생성하지는 않는다.
-- `.harness-helm/runs/**`는 official KB가 아니며 default retrieval input도 아니다. `h2-archive`에서는 feature runs folder를 `docs/_archive/{archive-folder}/runs/`로 이동한 뒤 run별 Markdown 산출물만 남기고, archive root의 `stage-runtime-summary.md`에 사람이 읽는 timing summary를 남긴다.
+- `.harness-helm/runs/**`는 official KB가 아니며 default retrieval input도 아니다. `h2-archive`에서는 feature runs folder를 `docs/_archive/{archive-folder}/runs/`로 이동한 뒤 run별 Markdown 산출물만 남기고, archive root의 `runs-summary.md`에 사람이 읽는 timing summary를 남긴다.
 - official docs로 옮기기 전에 sensitive/raw output을 제거하거나 mask한다.
 
 ## Codex Adapter Rules
