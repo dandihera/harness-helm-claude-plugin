@@ -1,6 +1,6 @@
 ---
 name: doctor
-description: harness-helm plugin의 first-run command. plugin install 직후 사용자가 실행하면 환경 사전점검 → bootstrap dry-run preview → 사용자 승인 → harness.py install 호출까지 한 흐름으로 처리합니다. 사용자가 별도로 /h2:bootstrap 같은 명령을 알 필요가 없습니다.
+description: harness-helm plugin의 first-run command. plugin install 직후 사용자가 실행하면 환경 사전점검 → Go bootstrap dry-run preview → 사용자 승인 → target runtime 설치까지 한 흐름으로 처리합니다. 사용자가 별도로 /h2:bootstrap 같은 명령을 알 필요가 없습니다.
 user-invocable: true
 argument: optional
 allowed-tools: [Bash, Read]
@@ -46,16 +46,26 @@ allowed-tools: [Bash, Read]
    - 모두 실패하면 사용자에게 `--plugin-root <path>`를 제공하도록 안내 후 중단.
 
 3. **Preflight**
-   - `Bash`로 `python3 --version` 확인. 없으면 최소 버전 안내 후 FAIL로 중단.
    - `Bash`로 `test -f <plugin-root>/release/h2-install/MANIFEST.txt` 확인. 없으면 plugin payload 누락 FAIL.
+   - `Bash`로 `<plugin-root>/release/h2-install/h2-install-v*.txt` marker 중 최고 version을 확인.
+   - host platform이 `darwin/arm64`, `darwin/amd64`, `linux/amd64`, `linux/arm64`, `windows/amd64` 중 하나인지 확인. Windows ARM64 등 unsupported platform이면 remediation과 함께 FAIL.
+   - `H2_HARNESS_RELEASE_BASE`가 주어졌으면 해당 release base에서 선택된 Go binary asset과 `<asset>.sha256`이 접근 가능한지 확인. 주어지지 않았으면 plugin/public release asset base를 사용한다.
    - 권장 plugin (`superpowers`, `gstack`, `compound-engineering`) 설치 여부를 `~/.claude/plugins/installed_plugins.json`에서 확인. 누락은 WARN으로 안내(bootstrap 차단하지 않음).
 
 4. **Bootstrap dry-run preview**
    - `Bash`로 다음을 실행하여 변경 사항을 미리 보여준다:
 
 ```text
-python3 <plugin-root>/release/h2-install/payload/.harness-helm/scripts/harness.py install \
-  --manifest <plugin-root>/release/h2-install/MANIFEST.txt \
+h2-install.sh \
+  --target <target> \
+  --dry-run \
+  [--backup] [--allow-non-git]
+```
+
+   Windows target에서는 PowerShell equivalent를 사용한다:
+
+```text
+h2-install.ps1 \
   --target <target> \
   --dry-run \
   [--backup] [--allow-non-git]
@@ -71,14 +81,17 @@ python3 <plugin-root>/release/h2-install/payload/.harness-helm/scripts/harness.p
    - 사용자가 Apply를 선택하면 같은 명령을 `--dry-run` 없이 실행한다:
 
 ```text
-python3 <plugin-root>/release/h2-install/payload/.harness-helm/scripts/harness.py install \
-  --manifest <plugin-root>/release/h2-install/MANIFEST.txt \
+h2-install.sh \
   --target <target> \
   [--backup] [--allow-non-git]
 ```
 
+   Windows target에서는 `h2-install.ps1`을 같은 argument로 실행한다.
+
 7. **Post-apply result**
    - `<target>/.harness-helm/install-manifest.json` 경로를 출력.
+   - `<target>/.harness-helm/bin/harness(.exe)` 경로와 `install-manifest.json.runtime_binary` evidence를 출력.
+   - `<target>/.harness-helm/scripts/bin/harness(.exe)`가 존재하면 stale legacy path로 보고하고, `/h2:doctor` 또는 `h2-install` 재실행으로 새 `.harness-helm/bin/harness(.exe)` 경로를 복구하도록 안내.
    - 다음 권장 명령(`/h2:plan` 또는 `/h2:context`)을 한 줄 안내.
    - 진단 결과는 `<target>/.harness-helm/doctor/latest.json`에 log 용도로 남긴다 (guard 판정에는 사용하지 않음).
 

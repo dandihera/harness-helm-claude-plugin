@@ -17,7 +17,7 @@ upstream raw output
   -> official docs or run artifacts
 ```
 
-`raw/`, `normalized/`, `promotion-candidates/` 폴더 생성은 각 h2 command의 runtime cartridge 책임입니다. `harness.py`는 생성된 staging artifact와 cleanup rule을 검증하며, 이 폴더를 직접 만들지 않습니다.
+`raw/`, `normalized/`, `promotion-candidates/` 폴더 생성은 각 h2 command의 runtime cartridge 책임입니다. Go harness는 생성된 staging artifact와 cleanup rule을 검증하며, 이 폴더를 직접 만들지 않습니다.
 
 ## 필수 매핑
 

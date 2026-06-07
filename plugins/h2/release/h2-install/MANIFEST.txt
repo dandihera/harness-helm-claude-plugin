@@ -26,8 +26,6 @@ copy      payload/.harness-helm/h2-cartridge.yml                   .harness-helm
 copy      payload/.harness-helm/h2-compound.yml                    .harness-helm/h2-compound.yml
 copy      payload/.harness-helm/h2-harvest.yml                     .harness-helm/h2-harvest.yml
 copy      payload/.harness-helm/h2-schema.yml                      .harness-helm/h2-schema.yml
-copy      payload/.harness-helm/scripts/harness.py                 .harness-helm/scripts/harness.py
-copy_dir  payload/.harness-helm/scripts/harness_lib/               .harness-helm/scripts/harness_lib/
 copy      payload/.harness-helm/scripts/harness                    .harness-helm/scripts/harness
 copy      payload/.harness-helm/scripts/kb-index.sh                .harness-helm/scripts/kb-index.sh
 copy      payload/.harness-helm/scripts/kb-lint.sh                 .harness-helm/scripts/kb-lint.sh
@@ -37,12 +35,14 @@ copy_dir  payload/.harness-helm/runs/_templates/                   .harness-helm
 # Claude Code adapter surface
 copy_dir  payload/.claude/commands/h2/                             .claude/commands/h2/
 copy      payload/.claude/skills/harness-helm/SKILL.md             .claude/skills/harness-helm/SKILL.md
+copy      payload/.claude/skills/harness-helm/SKILL.ko.md          .claude/skills/harness-helm/SKILL.ko.md
 copy_dir  payload/.claude/skills/harness-helm/references/          .claude/skills/harness-helm/references/
 copy_dir  payload/.claude/skills/h2-harvest/                       .claude/skills/h2-harvest/
 
 # Codex adapter surface
 copy_dir  payload/.codex/skills/h2/                                .codex/skills/h2/
 copy      payload/.codex/skills/harness-helm/SKILL.md              .codex/skills/harness-helm/SKILL.md
+copy      payload/.codex/skills/harness-helm/SKILL.ko.md           .codex/skills/harness-helm/SKILL.ko.md
 copy_dir  payload/.codex/skills/harness-helm/references/           .codex/skills/harness-helm/references/
 copy_dir  payload/.codex/skills/h2-harvest/                        .codex/skills/h2-harvest/
 

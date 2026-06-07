@@ -17,7 +17,7 @@ upstream raw output
   -> official docs or run artifacts
 ```
 
-Creating `raw/`, `normalized/`, and `promotion-candidates/` folders is the responsibility of the runtime cartridge for each h2 command. `harness.py` validates produced staging artifacts and cleanup rules; it does not create those folders directly.
+Creating `raw/`, `normalized/`, and `promotion-candidates/` folders is the responsibility of the runtime cartridge for each h2 command. The Go harness validates produced staging artifacts and cleanup rules; it does not create those folders directly.
 
 ## Required Mapping
 

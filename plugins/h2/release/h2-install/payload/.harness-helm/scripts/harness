@@ -2,4 +2,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec python3 "$ROOT_DIR/scripts/harness.py" "$@"
+BIN="$ROOT_DIR/bin/harness"
+
+if [[ ! -x "$BIN" ]]; then
+  echo "harness: runtime binary missing at .harness-helm/bin/harness; run /h2:doctor or h2-install again." >&2
+  exit 1
+fi
+
+exec "$BIN" "$@"

@@ -27,7 +27,8 @@ tags:
 - `.harness-helm/h2-schema.yml`: docs frontmatter와 validation 정책
 - `.harness-helm/h2-cartridge.yml`: provider/surface/fallback/routing/output language mapping
 - `.harness-helm/h2-compound.yml`: compound write boundary와 review gate
-- `.harness-helm/scripts/harness.py`: validation과 workflow helper 구현
+- `.harness-helm/bin/harness`: target-local Go harness runtime binary
+- `.harness-helm/scripts/harness`: target-local Go harness runtime binary wrapper
 - `.harness-helm/runs/_templates/`: run artifact template
 - `docs/_templates/runs-summary.md`: archive root `runs-summary.md`의 Markdown template. 타이틀, 섹션명, 컬럼명 같은 사람이 읽는 문구는 이 template에서 관리하고, renderer는 summary row block만 주입한다.
 
@@ -109,7 +110,7 @@ docs/_archive/{month}/{timestamp}_{feature}/
 - `autorun_groups`: 동일 `autorun_id`로 묶인 child stage의 pipeline total과 반복 요약
 - `warnings`: legacy archive fallback, run-id timestamp mismatch, snapshot stage timing 누락 등 조회자가 알아야 할 조건
 
-Archive root의 `runs-summary.md`는 `docs/_templates/runs-summary.md`를 읽어 생성한다. Template은 사람이 읽는 타이틀, 섹션명, 컬럼명을 담고, `harness_lib.run_lifecycle` renderer는 다음 placeholder에 동적 값을 주입한다.
+Archive root의 `runs-summary.md`는 `docs/_templates/runs-summary.md`를 읽어 생성한다. Template은 사람이 읽는 타이틀, 섹션명, 컬럼명을 담고, Go harness renderer는 다음 placeholder에 동적 값을 주입한다.
 
 - `{{feature}}`
 - `{{generated_at}}`

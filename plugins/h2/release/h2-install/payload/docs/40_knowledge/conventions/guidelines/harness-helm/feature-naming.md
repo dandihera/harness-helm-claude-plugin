@@ -113,8 +113,8 @@ snapshot-archive-scope_gh_124
 
 - `rg -n "feature slug|feature명|issue-number|이슈 번호" cookbooks/0300-workflow-contract/0301-core-workflow-spec.md cookbooks/0500-enforcement/0503-h2-runtime-folder-structure.md cookbooks/0100-knowledge-base-foundation/0101-docs-folder-structure.md`
 - `rg -n "feature-naming.md|Feature naming|h2 feature naming" docs/40_knowledge/conventions/guidelines/harness-helm/README.md`
-- `.harness-helm/scripts/harness.py kb-lint`
-- `.harness-helm/scripts/harness.py kb-index`
+- `.harness-helm/scripts/harness kb-lint`
+- `.harness-helm/scripts/harness kb-index`
 
 ## References
 
